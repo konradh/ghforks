@@ -1,0 +1,82 @@
+@import "@fortawesome/fontawesome-free/css/all.css";
+
+#app {
+    max-width: 60em;
+    margin: auto;
+}
+
+.card {
+    .stats {
+        display: inline-flex;
+        flex-direction: row;
+        gap: 1em;
+    }
+    border: 1px solid black;
+    padding: 0.5em;
+    margin: 0.5em;
+
+    > * {
+        line-height: 2em;
+        > * {
+            line-height: normal;
+        }
+    }
+
+
+    .new-branches {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.4em;
+        > span {
+            flex-basis: content;
+        }
+    }
+    p.description {
+        margin: 0;
+        &::before {
+            content: "> ";
+        }
+        color: #333;
+    }
+}
+
+span.space {
+    display: inline-block;
+    width: 1em;
+}
+
+
+.i {
+    font-style: italic;
+}
+
+ul {
+    &.commits {
+        list-style: none;
+    }
+}
+
+
+a.repo {
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.additions {
+    font-family: monospace;
+    padding: 0em 0.2em 0em 0.2em;
+    background-color: #ccffd8;
+    &::before {
+        content: "+";
+    }
+}
+
+.deletions {
+    font-family: monospace;
+    padding: 0em 0.2em 0em 0.2em;
+    background-color: #ffd7d7;
+    &::before {
+        content: "-";
+    }
+}
