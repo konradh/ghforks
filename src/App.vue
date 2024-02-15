@@ -16,12 +16,17 @@
     <div id="repo-input" class="align-center">
       <RepoInput v-on:change="update"></RepoInput>
     </div>
-    <Repo v-if="repo" :repo="repo"></Repo>
-    <h2>Forks</h2>
-    <Forks v-if="forks" :forks="forks"></Forks>
-    <div v-else class="align-center">
-      <i class="fa-solid fa-spinner fa-spin"></i> loading
-    </div>
+    <template v-if="loading">
+      <Repo v-if="repo" :repo="repo"></Repo>
+      <div v-else class="align-center">
+        <i class="fa-solid fa-spinner fa-spin"></i> loading
+      </div>
+      <h2>Forks</h2>
+      <Forks v-if="forks" :forks="forks"></Forks>
+      <div v-else class="align-center">
+        <i class="fa-solid fa-spinner fa-spin"></i> loading
+      </div>
+    </template>
   </template>
 </template>
 
@@ -48,6 +53,7 @@ import { RepoQuery } from './types';
 
 const repo = ref();
 const forks = ref();
+const loading = ref(false);
 var octokit: Octokit | null = null;
 
 const authorized = ref(false);
@@ -68,9 +74,9 @@ async function update(repoQuery: RepoQuery) {
   if (!octokit) {
     return;
   }
+  loading.value = true;
   const api = new API(octokit, repoQuery);
   repo.value = await api.getRepo();
-
   forks.value = rank(await api.loadMoreForks());
 }
 </script>
