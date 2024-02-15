@@ -22,11 +22,6 @@ export interface Repo {
     branches: string[],
 };
 
-export interface AdditionalForkInfo {
-    descriptionChanged?: boolean,
-    newBranches?: string[],
-}
-
 export interface Commit {
     commitId: string,
     message: string,
@@ -36,12 +31,25 @@ export interface Commit {
 };
 
 export interface Diff {
-    headRef: string,
     aheadBy: number,
     behindBy: number,
     commits: Commit[],
 };
 
-export interface Fork extends Repo, AdditionalForkInfo {
+export interface ExtendedForkInfo {
+    descriptionChanged: boolean,
+    newBranches: string[],
+}
+
+export interface SimpleFork extends Repo {
     diff: Diff,
+}
+
+export interface Fork extends SimpleFork, ExtendedForkInfo {
+    diff: Diff,
+}
+
+export interface RateLimit {
+    remaining: Number
+    limit: Number
 }

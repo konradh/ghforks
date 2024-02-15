@@ -7,31 +7,30 @@
   <template v-else>
     <Authorization @signout="signOut"></Authorization>
     <br>
-    <RepoInput @input="update"></RepoInput>
-    <Repository v-if="repo" :repo="repo"></Repository>
+    <RepoInput v-on:change="update"></RepoInput>
+    <Repo v-if="repo" :repo="repo"></Repo>
     <Forks v-if="forks" :forks="forks"></Forks>
   </template>
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 
 import RepoInput from './components/RepoInput.vue'
 import Authorization from './components/Authorization.vue';
-import Forks from './components/Forks.vue';
-import Repository from './components/Repository.vue';
+import Forks from './components/repo/Forks.vue';
+import Repo from './components/repo/Repo.vue';
 
-import { RepoQuery } from './types';
-import { repository as getRepos , forks as getForks, addAdditionalForkInfo} from './queries';
+import { API } from './queries';
 import { rank } from './ranking';
 import { Octokit } from 'octokit';
+import { RepoQuery } from './types';
 
 const repo = ref();
 const forks = ref();
-var octokit : Octokit|null = null;
+var octokit: Octokit | null = null;
 
 const authorized = ref(false);
 
@@ -45,14 +44,14 @@ function signOut() {
   octokit = null;
 }
 
-async function update(repoInput: RepoQuery) {
+async function update(repoQuery: RepoQuery) {
+  forks.value = null;
+  repo.value = null;
   if (!octokit) {
     return;
   }
-  repo.value = await getRepos(octokit, repoInput);
-  const res =  await getForks(octokit, repoInput, repo.value.defaultBranch);
-  let f = await res.forks;
-  f = f.map(e => addAdditionalForkInfo(e, repo.value));
-  forks.value = rank(f);
+  const api = new API(octokit, repoQuery);
+  repo.value = await api.getRepo();
+  forks.value = rank(await api.loadMoreForks());
 }
 </script>

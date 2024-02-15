@@ -1,8 +1,9 @@
 import { Octokit } from "octokit";
-import { RepoQuery, Repo, Fork, PageInfo } from './types';
+import { RepoQuery, Repo, Fork, PageInfo, SimpleFork, Diff } from './types';
+import { listDiff } from "./utils";
 
 const queries = {
-    repo: `
+  repo: `
 query Repo($owner: String!, $name: String!, $cursor: String) {
   rateLimit {
     cost
@@ -47,7 +48,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
     }
   }
 }`,
-    forks: `
+  forks: `
 query Forks($name: String!, $owner: String!, $cursor: String) {
   rateLimit {
     cost
@@ -97,12 +98,12 @@ query Forks($name: String!, $owner: String!, $cursor: String) {
     }
   }
 }`,
-    diff: {
-        head: `
+  diff: {
+    head: `
 fragment DiffInfo on Comparison {
   aheadBy
   behindBy
-  commits(last: 20) {
+  commits(last: 10) {
     nodes {
       oid
       messageHeadline
@@ -123,48 +124,17 @@ query Diff($owner: String!, $name: String!, $baseBranch: String!) {
   }
   repository(owner: $owner, name: $name) {
     ref(qualifiedName: $baseBranch) {`,
-        forkHead: `: compare(headRef: "`,
-      forkTail: `") {
+    forkHead: `: compare(headRef: "`,
+    forkTail: `") {
         ...DiffInfo
       }
       `,
-        tail: `
+    tail: `
     }
   }
 }`,
-    },
+  },
 }
-
-// returns all elements of a that are not in b
-function branchDiff(a: string[], b: string[]) : string[] {
-    const bSet = new Set(b);
-    return a.filter(e => !bSet.has(e));
-}
-
-export async function repository(octokit: Octokit, repo: RepoQuery) : Promise<Repo>  {
- const r = await octokit.graphql.paginate(queries.repo, { ...repo });
-  return flattenRepo(r.repository);
-}
-
-async function getForks(octokit: Octokit, repo: RepoQuery, cursor? : string) : Promise<any> {
-  return await octokit.graphql(queries.forks, { ...repo, cursor });
-}
-
-async function getForksWithDiff(octokit: Octokit, repo: RepoQuery, baseBranch: string, forks: [any]) : Promise<Fork[]> {
-  const forkQueries = [];
-  for (let i = 0; i < forks.length; i++) {
-    const f = forks[i];
-    const headRef = `${f.owner.login}:${f.name}:${f.defaultBranchRef.name}`;
-    forkQueries.push(`fork${i}` + queries.diff.forkHead + headRef + queries.diff.forkTail);
-  };
-  const query = queries.diff.head + forkQueries.join() + queries.diff.tail;
-  const diffs : any = await octokit.graphql(query, {...repo, baseBranch })
-
-  for (let i = 0; i < forks.length; i++) {
-    forks[i].defaultBranchRef.compare = diffs.repository.ref[`fork${i}`];
-  }
-  return forks.map(flattenFork);
-};
 
 function flattenRepo(r: any): Repo {
   return {
@@ -181,49 +151,95 @@ function flattenRepo(r: any): Repo {
 
     defaultBranch: r.defaultBranchRef.name,
 
-    branches: r.refs.nodes.map((o : any) => o.name),
+    branches: r.refs.nodes.map((o: any) => o.name),
   }
 }
 
-function flattenFork(f: any) : Fork {
+function flattenDiff(f: any): Diff {
   return {
-    ...flattenRepo(f),
-    diff: {
-      headRef: f.defaultBranchRef.name,
-      aheadBy: f.defaultBranchRef.compare.aheadBy,
-      behindBy: f.defaultBranchRef.compare.behindBy,
-      commits: f.defaultBranchRef.compare.commits.nodes.map((o: any) => {
-        return {
-          commitId: o.oid,
-          message: o.messageHeadline,
-          additions: o.additions,
-          deletions: o.deletions,
-          committedDate: o.committedDate,
-      }})
-    },
-  };
+    aheadBy: f.aheadBy,
+    behindBy: 0,
+    commits: f.commits.nodes.map((o: any) => {
+      return {
+        commitId: o.oid,
+        message: o.messageHeadline,
+        additions: o.additions,
+        deletions: o.deletions,
+        committedDate: o.committedDate,
+      }
+    })
+  }
 }
 
-export function addAdditionalForkInfo(f: Fork, r: Repo): Fork {
+function addExtendedForkInfo(f: SimpleFork, r: Repo): Fork {
   return {
     ...f,
     descriptionChanged: f.description !== r.description,
-    newBranches: branchDiff(f.branches, r.branches),
+    newBranches: listDiff(f.branches, r.branches),
   }
 }
+export class API {
+  #query: RepoQuery;
+  #forksCursor: PageInfo | null = null;
+  #octokit: Octokit
+  repo: Repo | null = null;
 
+  constructor(octokit: Octokit, query: RepoQuery) {
+    this.#query = query;
+    this.#octokit = octokit;
+  }
 
-export async function forks(octokit: Octokit, repo: RepoQuery, baseBranch: string, cursor?: string): Promise<{pageInfo: PageInfo, forks: Promise<Fork[]>}> {
-  const forks = await getForks(octokit, repo, cursor);
-  const pageInfo = forks.repository.forks.pageInfo as PageInfo;
+  async getRepo(): Promise<Repo> {
+    if (this.repo) {
+      return this.repo;
+    }
+    const r = await this.#octokit.graphql.paginate(queries.repo, { ...this.#query });
+    this.repo = flattenRepo(r.repository);
+    return this.repo;
+  }
 
-  const diffs = getForksWithDiff(octokit, repo, baseBranch, forks.repository.forks.nodes);
+  async loadMoreForks(): Promise<Fork[]> {
+    if (this.#forksCursor && !this.#forksCursor.hasNextPage) {
+      return [];
+    }
+    const repo = await this.getRepo();
+    const forkRepos = await this.#getForks();
+    const forks = await this.#getForksWithDiff(forkRepos);
+    const extendedForks = forks.map(f => addExtendedForkInfo(f, repo));
+    return extendedForks;
+  }
 
-  // Merge the result of both queries.
+  async #getForks(): Promise<Repo[]> {
+    const rawForks: any = await this.#octokit.graphql(queries.forks, {
+      ...this.#query,
+      cursor: this.#forksCursor?.endCursor ?? null
+    });
+    this.#forksCursor = rawForks.repository.forks.pageInfo;
+    const forkRepos: Repo[] = rawForks.repository.forks.nodes.map(flattenRepo);
+    return forkRepos;
+  }
 
+  async #getForksWithDiff(forks: Repo[]): Promise<SimpleFork[]> {
+    const repo = await this.getRepo();
+    const query = this.#buildDiffQuery(forks);
 
-  return {
-    forks: diffs,
-    pageInfo,
-  };
+    const rawDiffs: any = await this.#octokit.graphql(query, { ...this.#query, baseBranch: repo.defaultBranch })
+    return forks.map((fork, i) => {
+      return {
+        ...fork,
+        diff: flattenDiff(rawDiffs.repository.ref[`fork${i}`]),
+      }
+    })
+  }
+
+  #buildDiffQuery(forks: Repo[]): string {
+    const forkQueries = [];
+    for (let i = 0; i < forks.length; i++) {
+      const fork = forks[i];
+      const headRef = `${fork.owner}:${fork.name}:${fork.defaultBranch}`;
+      forkQueries.push(`fork${i}` + queries.diff.forkHead + headRef + queries.diff.forkTail);
+    };
+    const query = queries.diff.head + forkQueries.join() + queries.diff.tail;
+    return query;
+  }
 }
