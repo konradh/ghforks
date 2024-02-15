@@ -15,12 +15,12 @@
             </div>
         </div>
         <div v-if="fork.diff.aheadBy > 0">
-            <details>
+            <details class="commits">
                 <summary>
                     {{ fork.diff.aheadBy }} ahead, {{ fork.diff.behindBy }} behind.
                     View latest commits.
                 </summary>
-                <ul class="commits">
+                <ul>
                     <li v-for="commit in fork.diff.commits" :key="commit.commitId">
                         <i class="fa-solid fa-code-commit"></i> <span class="additions">{{ commit.additions
                         }}</span><span class="deletions">{{ commit.deletions }}</span> <a

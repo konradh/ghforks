@@ -13,6 +13,12 @@
 }
 </style>
 
+<style scoped>
+input {
+    width: 100%;
+}
+</style>
+
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { RepoQuery } from '../types';
@@ -34,8 +40,12 @@ function parseRepo(input: string): RepoQuery | null {
 }
 
 function validate() {
-    const repo = parseRepo(input.value);
-    isValid.value = repo !== null;
+    if (input.value === "") {
+        isValid.value = true;
+    } else {
+        const repo = parseRepo(input.value);
+        isValid.value = repo !== null;
+    }
 }
 
 function updateFromInput() {
@@ -52,7 +62,7 @@ function update(repo: RepoQuery | null) {
     if (!repo) {
         return;
     }
-    isValid.value = true;
+    validate();
     const asString = `${repo.owner}/${repo.name}`;
     input.value = asString;
     window.location.hash = asString;
@@ -62,6 +72,7 @@ function update(repo: RepoQuery | null) {
 window.onhashchange = updateFromHash;
 
 onMounted(async () => {
+    validate();
     updateFromHash();
 })
 </script>
