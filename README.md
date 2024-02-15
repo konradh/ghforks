@@ -1,16 +1,24 @@
-# GitHub Spork (Special Fork)
+# GitHub Sporks
+
+Find **sp**ecial **forks** of GitHub projects.
+
+## Development setup
+
+1. Copy `.env.example` to `.env.development` and change the variables appropriately.
+2. `npm install`
+3. `npm run dev`
 
 ## Deployment on GitHub Pages
 
-1. Set the variables `VITE_CLIENT_ID`, `VITE_OAUTH_APP_PROXY` and `VITE_BASE` in `.env.production` appropriately.
+1. Copy `.env.example` to `.env.production` and change the variables appropriately.
 2. Build the Vite project. This will place the page in the `dist/` folder.
-    ```shell
-    npm run build
-    ```
+   ```shell
+   npm run build
+   ```
 3. Go to the worktree at `dist/`, commit and push.
-    ```shell
-    cd dist
-    git add .
-    git commit
-    git push
-    ```
+   ```shell
+   cd dist
+   git add .
+   git commit
+   git push
+   ```
