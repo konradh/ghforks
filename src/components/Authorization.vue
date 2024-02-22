@@ -51,6 +51,7 @@ async function checkAuthorization(): Promise<boolean> {
 async function signIn(retry: boolean = true) {
     const auth = await octokit.auth();
     if (!auth) {
+        // TODO: Remove repo scope here when it is no longer necessary.
         await octokit.auth({ type: "signIn", scopes: ["repo"] });
     }
     if (!(await checkAuthorization())) {

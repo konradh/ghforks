@@ -21,20 +21,19 @@
       <div v-else class="align-center">
         <i class="fa-solid fa-spinner fa-spin"></i> loading
       </div>
-      <h2>Forks</h2>
-      <Forks v-if="forks" :forks="forks"></Forks>
-      <div v-else class="align-center">
-        <i class="fa-solid fa-spinner fa-spin"></i> loading
+      <div>
+        <h2>Forks</h2>
+        <div v-if="!forks" class="align-center">
+          <i class="fa-solid fa-spinner fa-spin"></i> loading
+        </div>
+        <div v-else-if="forks.length === 0" class="align-center">
+          This repository has no forks.
+        </div>
+        <Forks v-else :forks="forks"></Forks>
       </div>
     </template>
   </template>
 </template>
-
-<style scoped>
-#repo-input {
-  width: 20em;
-}
-</style>
 
 <script setup lang="ts">
 import { ref } from 'vue';
@@ -55,8 +54,11 @@ const repo = ref();
 const forks = ref();
 const loading = ref(false);
 var octokit: Octokit | null = null;
+var lastQuery: RepoQuery | null = null;
 
 const authorized = ref(false);
+
+const batchSize = 100;
 
 function signIn(ok: Octokit) {
   authorized.value = true;
@@ -69,6 +71,11 @@ function signOut() {
 }
 
 async function update(repoQuery: RepoQuery) {
+  if (lastQuery && lastQuery.owner === repoQuery.owner && lastQuery.name === repoQuery.name) {
+    return;
+  }
+  lastQuery = repoQuery;
+
   forks.value = null;
   repo.value = null;
   if (!octokit) {
@@ -77,6 +84,18 @@ async function update(repoQuery: RepoQuery) {
   loading.value = true;
   const api = new API(octokit, repoQuery);
   repo.value = await api.getRepo();
-  forks.value = rank(await api.loadMoreForks());
+  if (!repo) {
+    loading.value = false;
+    forks.value = [];
+    return;
+  }
+  while (api.canLoadMore()) {
+    await api.getForks(batchSize)
+      .then(async (fs) => {
+        forks.value = rank(api.forks());
+        api.getDiffs(fs);
+        forks.value = rank(api.forks());
+      });
+  }
 }
 </script>

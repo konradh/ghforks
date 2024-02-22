@@ -1,27 +1,33 @@
 @import "@fortawesome/fontawesome-free/css/all.css";
 
 #app {
-  max-width: 60rem;
+  max-width: 60em;
   margin: auto;
 
-  > div.text {
-    max-width: 40rem;
+  >div.text {
+    max-width: 40em;
     margin: auto;
+  }
+
+  >div {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
   }
 }
 
 .faq {
   details[open] {
-    padding-bottom: 0.5rem;
-    > p {
-      margin-left: 0.5rem;
-      padding-left: 0.5rem;
-      border-left: 0.2rem solid #bbb;
+    padding-bottom: 0.5em;
+
+    >p {
+      margin-left: 0.5em;
+      padding-left: 0.5em;
+      border-left: 0.2em solid #bbb;
     }
   }
 
   summary {
-    padding: 0.5rem 0;
+    padding: 0.5em 0;
     cursor: pointer;
   }
 }
@@ -30,6 +36,7 @@
   text-align: center;
   margin: auto;
 }
+
 .align-right {
   text-align: right;
   margin-left: auto;
@@ -41,28 +48,34 @@ h3 {
   text-align: center;
 }
 
+#repo-input {
+  width: 20em;
+}
+
 .card {
+  background-color: white;
+
   .stats {
     display: inline-flex;
     flex-direction: row;
-    gap: 1rem;
+    gap: 1em;
   }
 
   border: 1px solid black;
-  padding: 0.5rem;
-  margin: 0.5rem;
+  padding: 0.5em;
+  margin: 0.5em;
 
-  > div {
-    margin: 0.5rem;
+  >div {
+    margin: 0.5em;
   }
 
   .new-branches {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.4em;
 
-    > span {
+    >span {
       flex-basis: content;
     }
   }
@@ -79,7 +92,7 @@ h3 {
 
 span.space {
   display: inline-block;
-  width: 1rem;
+  width: 1em;
 }
 
 .i {
@@ -90,7 +103,7 @@ span.space {
   ul {
     list-style: none;
 
-    > li {
+    >li {
       padding-left: 0;
     }
   }
@@ -107,7 +120,7 @@ a.repo {
 
 .additions {
   font-family: monospace;
-  padding: 0rem 0.2rem 0rem 0.2rem;
+  padding: 0em 0.2em 0em 0.2em;
   background-color: #ccffd8;
 
   &::before {
@@ -117,7 +130,7 @@ a.repo {
 
 .deletions {
   font-family: monospace;
-  padding: 0rem 0.2rem 0rem 0.2rem;
+  padding: 0em 0.2em 0em 0.2em;
   background-color: #ffd7d7;
 
   &::before {

@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { RepoQuery, Repo, Fork, PageInfo, SimpleFork, Diff } from './types';
+import { RepoQuery, Repo, Fork, PageInfo, Diff, ExtendedForkInfo } from './types';
 import { listDiff } from "./utils";
 
 const queries = {
@@ -49,7 +49,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
   }
 }`,
   forks: `
-query Forks($name: String!, $owner: String!, $cursor: String) {
+query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
   rateLimit {
     cost
     limit
@@ -59,7 +59,7 @@ query Forks($name: String!, $owner: String!, $cursor: String) {
     used
   }
   repository(name: $name, owner: $owner) {
-    forks(first: 100, after: $cursor, privacy: PUBLIC, orderBy: { direction: DESC, field: UPDATED_AT }) {
+    forks(first: $count, after: $cursor, privacy: PUBLIC, orderBy: { direction: DESC, field: PUSHED_AT }) {
       pageInfo {
         hasNextPage
         endCursor
@@ -158,7 +158,7 @@ function flattenRepo(r: any): Repo {
 function flattenDiff(f: any): Diff {
   return {
     aheadBy: f.aheadBy,
-    behindBy: 0,
+    behindBy: f.behindBy,
     commits: f.commits.nodes.map((o: any) => {
       return {
         commitId: o.oid,
@@ -171,9 +171,8 @@ function flattenDiff(f: any): Diff {
   }
 }
 
-function addExtendedForkInfo(f: SimpleFork, r: Repo): Fork {
+function extendedForkInfo(f: Fork, r: Repo): ExtendedForkInfo {
   return {
-    ...f,
     descriptionChanged: f.description !== r.description,
     newBranches: listDiff(f.branches, r.branches),
   }
@@ -183,10 +182,20 @@ export class API {
   #forksCursor: PageInfo | null = null;
   #octokit: Octokit
   repo: Repo | null = null;
+  #forks: Map<string, Fork>;
 
   constructor(octokit: Octokit, query: RepoQuery) {
     this.#query = query;
     this.#octokit = octokit;
+    this.#forks = new Map<string, Fork>()
+  }
+
+  forks(): Fork[] {
+    return Array.from(this.#forks.values());
+  }
+
+  canLoadMore(): boolean {
+    return !this.#forksCursor || this.#forksCursor.hasNextPage
   }
 
   async getRepo(): Promise<Repo> {
@@ -198,38 +207,49 @@ export class API {
     return this.repo;
   }
 
-  async loadMoreForks(): Promise<Fork[]> {
-    if (this.#forksCursor && !this.#forksCursor.hasNextPage) {
+  async getForks(count: Number = 100): Promise<Repo[]> {
+    if (!this.canLoadMore()) {
       return [];
     }
     const repo = await this.getRepo();
-    const forkRepos = await this.#getForks();
-    const forks = await this.#getForksWithDiff(forkRepos);
-    const extendedForks = forks.map(f => addExtendedForkInfo(f, repo));
-    return extendedForks;
-  }
-
-  async #getForks(): Promise<Repo[]> {
+    if (!repo || repo.forkCount === 0) {
+      return [];
+    }
     const rawForks: any = await this.#octokit.graphql(queries.forks, {
       ...this.#query,
-      cursor: this.#forksCursor?.endCursor ?? null
+      cursor: this.#forksCursor?.endCursor ?? null,
+      count: count
     });
     this.#forksCursor = rawForks.repository.forks.pageInfo;
     const forkRepos: Repo[] = rawForks.repository.forks.nodes.map(flattenRepo);
+
+    for (const fork of forkRepos) {
+      this.#forks.set(fork.id, fork);
+    }
+
     return forkRepos;
   }
 
-  async #getForksWithDiff(forks: Repo[]): Promise<SimpleFork[]> {
+  async getDiffs(forks: Repo[]): Promise<Fork[]> {
+    if (forks.length === 0) {
+      return [];
+    }
     const repo = await this.getRepo();
     const query = this.#buildDiffQuery(forks);
-
     const rawDiffs: any = await this.#octokit.graphql(query, { ...this.#query, baseBranch: repo.defaultBranch })
-    return forks.map((fork, i) => {
+    const extendedForks = forks.map((fork, i) => {
       return {
         ...fork,
         diff: flattenDiff(rawDiffs.repository.ref[`fork${i}`]),
+        extendedInfo: extendedForkInfo(fork, repo),
       }
     })
+
+    for (const fork of extendedForks) {
+      this.#forks.set(fork.id, fork);
+    }
+
+    return extendedForks;
   }
 
   #buildDiffQuery(forks: Repo[]): string {

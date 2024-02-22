@@ -41,12 +41,9 @@ export interface ExtendedForkInfo {
     newBranches: string[],
 }
 
-export interface SimpleFork extends Repo {
-    diff: Diff,
-}
-
-export interface Fork extends SimpleFork, ExtendedForkInfo {
-    diff: Diff,
+export interface Fork extends Repo {
+    diff?: Diff,
+    extendedInfo?: ExtendedForkInfo
 }
 
 export interface RateLimit {

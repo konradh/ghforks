@@ -1,24 +1,23 @@
 <template>
     <div class="card">
         <RepoHead :repo="fork"></RepoHead>
-        <p v-if="fork.descriptionChanged" class="description">{{ fork.description }}</p>
-        <div v-if="fork?.newBranches?.length > 0">
+        <p v-if="fork.extendedInfo?.descriptionChanged" class="description">{{ fork.description }}</p>
+        <div v-if="fork.extendedInfo && fork.extendedInfo?.newBranches.length > 0">
             <div class="new-branches">
                 <span>branches not present in parent:</span>
                 <div>
-                    <template v-for="(branch, idx) in fork.newBranches" :key="branch">
+                    <template v-for="(branch, idx) in fork.extendedInfo?.newBranches" :key="branch">
                         <a :href="`${fork.url}/tree/${branch}`" target="_blank">
                             {{ branch }}
-                        </a><template v-if="idx != fork.newBranches.length - 1">, </template>
+                        </a><template v-if="idx != fork.extendedInfo?.newBranches.length - 1">, </template>
                     </template>
                 </div>
             </div>
         </div>
-        <div v-if="fork.diff.aheadBy > 0">
+        <div v-if="fork.diff && fork.diff?.aheadBy > 0">
             <details class="commits">
                 <summary>
                     {{ fork.diff.aheadBy }} ahead, {{ fork.diff.behindBy }} behind.
-                    View latest commits.
                 </summary>
                 <ul>
                     <li v-for="commit in fork.diff.commits" :key="commit.commitId">
@@ -32,8 +31,8 @@
                 </ul>
             </details>
         </div>
-        <div v-else>
-            <span>{{ fork.diff.aheadBy }} ahead</span>, <span>{{ fork.diff.behindBy }} behind</span>.
+        <div v-else-if="fork.diff">
+            {{ fork.diff.aheadBy }} ahead, {{ fork.diff.behindBy }} behind.
         </div>
     </div>
 </template>
