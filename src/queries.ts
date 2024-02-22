@@ -26,7 +26,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
     stargazers {
       totalCount
     }
-    updatedAt
+    pushedAt
     forkCount
     defaultBranchRef {
       name
@@ -79,7 +79,7 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
         stargazers {
           totalCount
         }
-        updatedAt
+        pushedAt
         forkCount
         refs(
           refPrefix: "refs/heads/"
@@ -143,7 +143,7 @@ function flattenRepo(r: any): Repo {
     owner: r.owner.login,
     description: r.description,
     url: r.url,
-    updatedAt: new Date(r.updatedAt),
+    pushedAt: new Date(r.pushedAt),
 
     forkCount: r.forkCount,
     stars: r.stargazers.totalCount,

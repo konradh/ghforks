@@ -9,7 +9,7 @@
         </div>
     </div>
     <div>
-        <span><i class="fa-solid fa-heart-pulse"></i> updated {{ timeDiffApprox(repo.updatedAt) }}</span>
+        <span><i class="fa-solid fa-heart-pulse"></i> pushed to {{ timeDiffApprox(repo.pushedAt) }}</span>
     </div>
 </template>
 

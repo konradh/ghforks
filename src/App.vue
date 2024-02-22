@@ -12,26 +12,11 @@
   <template v-else>
     <div class="align-right">
       <Authorization @signout="signOut"></Authorization>
-    </div>
-    <div id="repo-input" class="align-center">
-      <RepoInput v-on:change="update"></RepoInput>
-    </div>
-    <template v-if="loading">
-      <Repo v-if="repo" :repo="repo"></Repo>
-      <div v-else class="align-center">
-        <i class="fa-solid fa-spinner fa-spin"></i> loading
+      <div id="repo-input" class="align-center">
+        <RepoInput v-on:change="update"></RepoInput>
       </div>
-      <div>
-        <h2>Forks</h2>
-        <div v-if="!forks" class="align-center">
-          <i class="fa-solid fa-spinner fa-spin"></i> loading
-        </div>
-        <div v-else-if="forks.length === 0" class="align-center">
-          This repository has no forks.
-        </div>
-        <Forks v-else :forks="forks"></Forks>
-      </div>
-    </template>
+    </div>
+    <Forks :octokit="octokit" :query="repoQuery"></Forks>
   </template>
 </template>
 
@@ -40,62 +25,28 @@ import { ref } from 'vue';
 
 import RepoInput from './components/RepoInput.vue'
 import Authorization from './components/Authorization.vue';
-import Forks from './components/repo/Forks.vue';
-import Repo from './components/repo/Repo.vue';
 import Faq from './components/Faq.vue';
+import Forks from './components/Forks.vue';
 
 
-import { API } from './queries';
-import { rank } from './ranking';
 import { Octokit } from 'octokit';
 import { RepoQuery } from './types';
 
-const repo = ref();
-const forks = ref();
-const loading = ref(false);
-var octokit: Octokit | null = null;
-var lastQuery: RepoQuery | null = null;
-
 const authorized = ref(false);
-
-const batchSize = 100;
+const octokit = ref<Octokit | null>(null);
+const repoQuery = ref<RepoQuery | null>(null)
 
 function signIn(ok: Octokit) {
   authorized.value = true;
-  octokit = ok;
+  octokit.value = ok;
 }
 
 function signOut() {
   authorized.value = false;
-  octokit = null;
+  octokit.value = null;
 }
 
-async function update(repoQuery: RepoQuery) {
-  if (lastQuery && lastQuery.owner === repoQuery.owner && lastQuery.name === repoQuery.name) {
-    return;
-  }
-  lastQuery = repoQuery;
-
-  forks.value = null;
-  repo.value = null;
-  if (!octokit) {
-    return;
-  }
-  loading.value = true;
-  const api = new API(octokit, repoQuery);
-  repo.value = await api.getRepo();
-  if (!repo) {
-    loading.value = false;
-    forks.value = [];
-    return;
-  }
-  while (api.canLoadMore()) {
-    await api.getForks(batchSize)
-      .then(async (fs) => {
-        forks.value = rank(api.forks());
-        api.getDiffs(fs);
-        forks.value = rank(api.forks());
-      });
-  }
+function update(query: RepoQuery) {
+  repoQuery.value = query;
 }
 </script>

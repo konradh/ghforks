@@ -14,7 +14,7 @@ export interface Repo {
     owner: string,
     description: string,
     url: string,
-    updatedAt: Date,
+    pushedAt: Date,
     forkCount: number,
     stars: number,
     watchers: number,
