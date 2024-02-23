@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import { RepoQuery, Repo, Fork, PageInfo, Diff, ExtendedForkInfo } from './types';
 import { listDiff } from "./utils";
+import { score } from "./score";
 
 const queries = {
   repo: `
@@ -28,6 +29,9 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
     }
     pushedAt
     forkCount
+    forks(privacy: PUBLIC) {
+      totalCount
+    }
     defaultBranchRef {
       name
     }
@@ -81,6 +85,9 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
         }
         pushedAt
         forkCount
+        forks(privacy: PUBLIC) {
+          totalCount
+        }
         refs(
           refPrefix: "refs/heads/"
           orderBy: { field: TAG_COMMIT_DATE, direction: DESC }
@@ -103,7 +110,7 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
 fragment DiffInfo on Comparison {
   aheadBy
   behindBy
-  commits(last: 10) {
+  commits(last: 20) {
     nodes {
       oid
       messageHeadline
@@ -146,6 +153,8 @@ function flattenRepo(r: any): Repo {
     pushedAt: new Date(r.pushedAt),
 
     forkCount: r.forkCount,
+    publicForkCount: r.forks.totalCount,
+    privateForkCount: r.forkCount - r.forks.totalCount,
     stars: r.stargazers.totalCount,
     watchers: r.watchers.totalCount,
 
@@ -191,7 +200,7 @@ export class API {
   }
 
   forks(): Fork[] {
-    return Array.from(this.#forks.values());
+    return Array.from(this.#forks.values()).sort((a, b) => (b.forkScore ?? 0) - (a.forkScore ?? 0));
   }
 
   canLoadMore(): boolean {
@@ -212,7 +221,7 @@ export class API {
       return [];
     }
     const repo = await this.getRepo();
-    if (!repo || repo.forkCount === 0) {
+    if (!repo || repo.publicForkCount === 0) {
       return [];
     }
     const rawForks: any = await this.#octokit.graphql(queries.forks, {
@@ -223,9 +232,7 @@ export class API {
     this.#forksCursor = rawForks.repository.forks.pageInfo;
     const forkRepos: Repo[] = rawForks.repository.forks.nodes.map(flattenRepo);
 
-    for (const fork of forkRepos) {
-      this.#forks.set(fork.id, fork);
-    }
+    // this.#mergeForks(forkRepos);
 
     return forkRepos;
   }
@@ -245,11 +252,20 @@ export class API {
       }
     })
 
-    for (const fork of extendedForks) {
-      this.#forks.set(fork.id, fork);
-    }
+    this.#mergeForks(extendedForks);
 
     return extendedForks;
+  }
+
+  #mergeForks(forks: Fork[]) {
+    if (!this.repo) {
+      console.assert(this.repo);
+      return;
+    }
+    for (const fork of forks) {
+      fork.forkScore = score(fork, this.repo);
+      this.#forks.set(fork.id, fork);
+    }
   }
 
   #buildDiffQuery(forks: Repo[]): string {

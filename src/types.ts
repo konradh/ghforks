@@ -15,6 +15,8 @@ export interface Repo {
     description: string,
     url: string,
     pushedAt: Date,
+    privateForkCount: number,
+    publicForkCount: number,
     forkCount: number,
     stars: number,
     watchers: number,
@@ -44,9 +46,10 @@ export interface ExtendedForkInfo {
 export interface Fork extends Repo {
     diff?: Diff,
     extendedInfo?: ExtendedForkInfo
+    forkScore?: number,
 }
 
 export interface RateLimit {
-    remaining: Number
-    limit: Number
+    remaining: number
+    limit: number
 }
