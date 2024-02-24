@@ -1,9 +1,9 @@
 <template>
     <Repo v-if="repo" :repo="repo"></Repo>
-    <div v-else class="align-center">
+    <div v-else-if="loading" class="align-center">
         <i class="fa-solid fa-spinner fa-spin"></i> loading
     </div>
-    <div>
+    <div v-if="repo">
         <h2>Forks<template v-if="repo"> ({{ forks.length }} of {{ repo.publicForkCount
         }})</template></h2>
         <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
