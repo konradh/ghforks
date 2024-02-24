@@ -5,7 +5,9 @@
         <div class="stats">
             <span><i class="fa-solid fa-star"></i> {{ repo.stars }} stars</span>
             <span><i class="fa-solid fa-eye"></i> {{ repo.watchers }} watchers</span>
-            <span><i class="fa-solid fa-code-fork"></i> {{ repo.forkCount }} forks</span>
+            <span><i class="fa-solid fa-code-fork"></i> {{ repo.forkCount }} forks
+                <template v-if="repo.privateForkCount > 0">({{ repo.privateForkCount }} private)</template>
+            </span>
         </div>
     </div>
     <div>

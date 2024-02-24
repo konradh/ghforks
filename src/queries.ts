@@ -204,7 +204,10 @@ export class API {
   }
 
   canLoadMore(): boolean {
-    return !this.#forksCursor || this.#forksCursor.hasNextPage
+    if (this.repo?.publicForkCount === 0) {
+      return false;
+    }
+    return !this.#forksCursor || this.#forksCursor.hasNextPage;
   }
 
   async getRepo(): Promise<Repo> {
