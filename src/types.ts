@@ -25,6 +25,7 @@ export interface Repo {
 };
 
 export interface Commit {
+    url: string,
     commitId: string,
     message: string,
     additions: number,

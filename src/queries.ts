@@ -3,6 +3,7 @@ import { RepoQuery, Repo, Fork, PageInfo, Diff, ExtendedForkInfo } from './types
 import { listDiff } from "./utils";
 import { score } from "./score";
 
+
 const queries = {
   repo: `
 query Repo($owner: String!, $name: String!, $cursor: String) {
@@ -53,7 +54,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
   }
 }`,
   forks: `
-query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
+query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
   rateLimit {
     cost
     limit
@@ -63,7 +64,12 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
     used
   }
   repository(name: $name, owner: $owner) {
-    forks(first: $count, after: $cursor, privacy: PUBLIC, orderBy: { direction: DESC, field: PUSHED_AT }) {
+    forks(
+      first: $count
+      after: $cursor
+      privacy: PUBLIC
+      orderBy: {direction: DESC, field: PUSHED_AT}
+    ) {
       pageInfo {
         hasNextPage
         endCursor
@@ -90,7 +96,7 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
         }
         refs(
           refPrefix: "refs/heads/"
-          orderBy: { field: TAG_COMMIT_DATE, direction: DESC }
+          orderBy: {field: TAG_COMMIT_DATE, direction: DESC}
           first: 100
         ) {
           totalCount
@@ -99,48 +105,29 @@ query Forks($name: String!, $owner: String!, $cursor: String, $count: Int!) {
           }
         }
         defaultBranchRef {
-          name
+          compare(headRef: $baseRef) {
+            behindBy: aheadBy
+            aheadBy: behindBy
+          }
+          target {
+            ... on Commit {
+              history(first: 20) {
+                nodes {
+                  url
+                  oid
+                  messageHeadline
+                  committedDate
+                  additions
+                  deletions
+                }
+              }
+            }
+          }
         }
       }
     }
   }
 }`,
-  diff: {
-    head: `
-fragment DiffInfo on Comparison {
-  aheadBy
-  behindBy
-  commits(last: 20) {
-    nodes {
-      oid
-      messageHeadline
-      committedDate
-      additions
-      deletions
-    }
-  }
-}
-query Diff($owner: String!, $name: String!, $baseBranch: String!) {
-  rateLimit {
-    cost
-    limit
-    nodeCount
-    remaining
-    resetAt
-    used
-  }
-  repository(owner: $owner, name: $name) {
-    ref(qualifiedName: $baseBranch) {`,
-    forkHead: `: compare(headRef: "`,
-    forkTail: `") {
-        ...DiffInfo
-      }
-      `,
-    tail: `
-    }
-  }
-}`,
-  },
 }
 
 function flattenRepo(r: any): Repo {
@@ -164,12 +151,16 @@ function flattenRepo(r: any): Repo {
   }
 }
 
-function flattenDiff(f: any): Diff {
+function flattenDiff(ref: any): Diff {
+  if (ref.target.history.nodes.length > ref.compare.aheadBy) {
+    ref.target.history.nodes = ref.target.history.nodes.slice(0, ref.compare.aheadBy)
+  }
   return {
-    aheadBy: f.aheadBy,
-    behindBy: f.behindBy,
-    commits: f.commits.nodes.map((o: any) => {
+    aheadBy: ref.compare.aheadBy,
+    behindBy: ref.compare.behindBy,
+    commits: ref.target.history.nodes.map((o: any) => {
       return {
+        url: o.url,
         commitId: o.oid,
         message: o.messageHeadline,
         additions: o.additions,
@@ -219,7 +210,7 @@ export class API {
     return this.repo;
   }
 
-  async getForks(count: Number = 100): Promise<Repo[]> {
+  async getForks(count: Number): Promise<Repo[]> {
     if (!this.canLoadMore()) {
       return [];
     }
@@ -229,35 +220,27 @@ export class API {
     }
     const rawForks: any = await this.#octokit.graphql(queries.forks, {
       ...this.#query,
+      baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
       cursor: this.#forksCursor?.endCursor ?? null,
       count: count
     });
     this.#forksCursor = rawForks.repository.forks.pageInfo;
-    const forkRepos: Repo[] = rawForks.repository.forks.nodes.map(flattenRepo);
-
-    // this.#mergeForks(forkRepos);
-
-    return forkRepos;
-  }
-
-  async getDiffs(forks: Repo[]): Promise<Fork[]> {
-    if (forks.length === 0) {
-      return [];
-    }
-    const repo = await this.getRepo();
-    const query = this.#buildDiffQuery(forks);
-    const rawDiffs: any = await this.#octokit.graphql(query, { ...this.#query, baseBranch: repo.defaultBranch })
-    const extendedForks = forks.map((fork, i) => {
+    var forkRepos: Fork[] = rawForks.repository.forks.nodes.map((fork: any) => {
       return {
-        ...fork,
-        diff: flattenDiff(rawDiffs.repository.ref[`fork${i}`]),
-        extendedInfo: extendedForkInfo(fork, repo),
+        ...flattenRepo(fork),
+        diff: flattenDiff(fork.defaultBranchRef),
+      }
+    });
+    forkRepos = forkRepos.map((f: Fork) => {
+      return {
+        ...f,
+        extendedInfo: extendedForkInfo(f, repo)
       }
     })
 
-    this.#mergeForks(extendedForks);
+    this.#mergeForks(forkRepos);
 
-    return extendedForks;
+    return forkRepos;
   }
 
   #mergeForks(forks: Fork[]) {
@@ -269,16 +252,5 @@ export class API {
       fork.forkScore = score(fork, this.repo);
       this.#forks.set(fork.id, fork);
     }
-  }
-
-  #buildDiffQuery(forks: Repo[]): string {
-    const forkQueries = [];
-    for (let i = 0; i < forks.length; i++) {
-      const fork = forks[i];
-      const headRef = `${fork.owner}:${fork.name}:${fork.defaultBranch}`;
-      forkQueries.push(`fork${i}` + queries.diff.forkHead + headRef + queries.diff.forkTail);
-    };
-    const query = queries.diff.head + forkQueries.join() + queries.diff.tail;
-    return query;
   }
 }

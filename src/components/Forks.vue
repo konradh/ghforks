@@ -5,7 +5,7 @@
     </div>
     <div v-if="repo">
         <h2>Forks<template v-if="repo"> ({{ forks.length }} of {{ repo.publicForkCount
-        }})</template></h2>
+                }})</template></h2>
         <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
             :loadingText="loadingText" class="align-center">
         </LoadMoreButton>
@@ -14,6 +14,7 @@
         </div>
         <div v-else>
             <TransitionGroup name="list">
+
                 <template v-for="fork in usefulForks" :key="fork.id">
                     <Fork :fork="fork"></Fork>
                 </template>
@@ -21,14 +22,15 @@
             <details v-if="uselessForks.length > 0">
                 <summary>{{ uselessForks.length }} useless forks</summary>
                 <TransitionGroup name="list">
+
                     <template v-for="fork in uselessForks" :key="fork.id">
                         <Fork :fork="fork"></Fork>
                     </template>
                 </TransitionGroup>
             </details>
         </div>
-        <LoadMoreButton v-if="canLoadMore && forks.length > 0" @click="loadMore" v-model="keepLoading" :loading="loading"
-            :loadingText="loadingText" class="align-center">
+        <LoadMoreButton v-if="canLoadMore && forks.length > 0" @click="loadMore" v-model="keepLoading"
+            :loading="loading" :loadingText="loadingText" class="align-center">
         </LoadMoreButton>
     </div>
 </template>
@@ -89,7 +91,7 @@ const forks = ref<ForkType[]>([]);
 const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.forkScore && f.forkScore > 0));
 const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.forkScore || f.forkScore <= 0));
 
-const batchSize = 100;
+const batchSize = 50;
 
 async function loadMore() {
     if (!api) {
@@ -106,17 +108,12 @@ async function loadMore() {
         forks.value = api.forks() ?? [];
         return;
     }
-    const promises = [];
     do {
-        do {
-            loadingText.value = "loading forks...";
-            const fs = await api.getForks(batchSize);
-            promises.push(api.getDiffs(fs).then(_ => forks.value = api?.forks() ?? []));
-        }
-        while (keepLoading.value && api.canLoadMore());
-        loadingText.value = "almost done...";
-        await Promise.all(promises);
-    } while (keepLoading.value && api.canLoadMore()); // Keep loading if the checkbox gets checked while waiting for the last promises.
+        loadingText.value = "loading forks...";
+        await api.getForks(batchSize);
+        forks.value = api.forks()
+    }
+    while (keepLoading.value && api.canLoadMore());
 
     loading.value = false;
     loadingText.value = "load more";
