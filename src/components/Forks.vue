@@ -14,17 +14,15 @@
         </div>
         <div v-else>
             <TransitionGroup name="list">
-
                 <template v-for="fork in usefulForks" :key="fork.id">
-                    <Fork :fork="fork"></Fork>
+                    <Fork :fork="fork" @requestCommits="loadCommits"></Fork>
                 </template>
             </TransitionGroup>
             <details v-if="uselessForks.length > 0">
                 <summary>{{ uselessForks.length }} useless forks</summary>
                 <TransitionGroup name="list">
-
                     <template v-for="fork in uselessForks" :key="fork.id">
-                        <Fork :fork="fork"></Fork>
+                        <Fork :fork="fork" @requestCommits="loadCommits"></Fork>
                     </template>
                 </TransitionGroup>
             </details>
@@ -88,8 +86,8 @@ const keepLoading = ref(false);
 
 const repo = ref<RepoType | null>(null);
 const forks = ref<ForkType[]>([]);
-const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.forkScore && f.forkScore > 0));
-const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.forkScore || f.forkScore <= 0));
+const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.score && f.score > 0));
+const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.score || f.score <= 0));
 
 const batchSize = 50;
 
@@ -110,7 +108,7 @@ async function loadMore() {
     }
     do {
         loadingText.value = "loading forks...";
-        await api.getForks(batchSize);
+        await api.getNextForks(batchSize);
         forks.value = api.forks()
     }
     while (keepLoading.value && api.canLoadMore());
@@ -118,5 +116,12 @@ async function loadMore() {
     loading.value = false;
     loadingText.value = "load more";
     canLoadMore.value = api.canLoadMore();
+}
+
+async function loadCommits(id: string) {
+    if (api) {
+        await api.getDiffCommits(id);
+        forks.value = api.forks();
+    }
 }
 </script>

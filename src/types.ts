@@ -34,23 +34,18 @@ export interface Commit {
 };
 
 export interface Diff {
+    base: string,
+    head: string,
+
     aheadBy: number,
     behindBy: number,
-    commits: Commit[],
-};
+    commits?: Commit[],
 
-export interface ExtendedForkInfo {
     descriptionChanged: boolean,
     newBranches: string[],
-}
+};
 
 export interface Fork extends Repo {
-    diff?: Diff,
-    extendedInfo?: ExtendedForkInfo
-    forkScore?: number,
-}
-
-export interface RateLimit {
-    remaining: number
-    limit: number
+    diff: Diff,
+    score: number,
 }

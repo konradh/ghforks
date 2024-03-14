@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { RepoQuery, Repo, Fork, PageInfo, Diff, ExtendedForkInfo } from './types';
+import { RepoQuery, Repo, Fork, PageInfo, Diff, Commit } from './types';
 import { listDiff } from "./utils";
 import { score } from "./score";
 
@@ -7,14 +7,6 @@ import { score } from "./score";
 const queries = {
   repo: `
 query Repo($owner: String!, $name: String!, $cursor: String) {
-  rateLimit {
-    cost
-    limit
-    nodeCount
-    remaining
-    resetAt
-    used
-  }
   repository(name: $name, owner: $owner) {
     owner {
       login
@@ -55,14 +47,6 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
 }`,
   forks: `
 query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
-  rateLimit {
-    cost
-    limit
-    nodeCount
-    remaining
-    resetAt
-    used
-  }
   repository(name: $name, owner: $owner) {
     forks(
       first: $count
@@ -105,29 +89,50 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
           }
         }
         defaultBranchRef {
+          name
           compare(headRef: $baseRef) {
             behindBy: aheadBy
             aheadBy: behindBy
-          }
-          target {
-            ... on Commit {
-              history(first: 20) {
-                nodes {
-                  url
-                  oid
-                  messageHeadline
-                  committedDate
-                  additions
-                  deletions
-                }
-              }
-            }
           }
         }
       }
     }
   }
 }`,
+  commits: {
+    head: `
+fragment Commits on Comparison {
+  headTarget {
+    repository {
+      id
+    }
+  }
+  commits(first: 50) {
+    nodes {
+      url
+      oid
+      message
+      additions
+      deletions
+      committedDate
+    }
+  }
+}
+query DiffCommits($name: String!, $owner: String!) {
+  repository(name: $name, owner: $owner) {
+    defaultBranchRef {
+`,
+    segment1: `: compare(headRef: "`,
+    segment2: `") {
+        ...Commits
+      }
+      `,
+    tail: `
+    }
+  }
+}
+`,
+  },
 }
 
 function flattenRepo(r: any): Repo {
@@ -151,32 +156,41 @@ function flattenRepo(r: any): Repo {
   }
 }
 
-function flattenDiff(ref: any): Diff {
-  if (ref.target.history.nodes.length > ref.compare.aheadBy) {
-    ref.target.history.nodes = ref.target.history.nodes.slice(0, ref.compare.aheadBy)
-  }
+function flattenDiffWithoutCommits(fork: any, parent: Repo): Diff {
+  const f = flattenRepo(fork);
   return {
-    aheadBy: ref.compare.aheadBy,
-    behindBy: ref.compare.behindBy,
-    commits: ref.target.history.nodes.map((o: any) => {
-      return {
-        url: o.url,
-        commitId: o.oid,
-        message: o.messageHeadline,
-        additions: o.additions,
-        deletions: o.deletions,
-        committedDate: o.committedDate,
-      }
-    })
+    base: `${parent.owner}:${parent.name}:${parent.defaultBranch}`,
+    head: `${f.owner}:${f.name}:${f.defaultBranch}`,
+    aheadBy: fork.defaultBranchRef.compare.aheadBy,
+    behindBy: fork.defaultBranchRef.compare.behindBy,
+    descriptionChanged: f.description !== parent.description,
+    newBranches: listDiff(f.branches, parent.branches),
   }
 }
 
-function extendedForkInfo(f: Fork, r: Repo): ExtendedForkInfo {
-  return {
-    descriptionChanged: f.description !== r.description,
-    newBranches: listDiff(f.branches, r.branches),
-  }
+interface Commits {
+  repoId: string,
+  commits: Commit[],
 }
+
+function flattenCommits(response: any): Commits[] {
+  console.log(response)
+  const repos = Object.values(response.repository.defaultBranchRef);
+  return repos.map((commits: any) => {
+    return {
+      repoId: commits.headTarget.repository.id,
+      commits: commits.commits.nodes.map((commit: any) => ({
+        url: commit.url,
+        commitId: commit.oid,
+        message: commit.message,
+        additions: commit.additions,
+        deletions: commit.deletions,
+        committedDate: commit.committedDate,
+      }))
+    }
+  })
+}
+
 export class API {
   #query: RepoQuery;
   #forksCursor: PageInfo | null = null;
@@ -191,7 +205,7 @@ export class API {
   }
 
   forks(): Fork[] {
-    return Array.from(this.#forks.values()).sort((a, b) => (b.forkScore ?? 0) - (a.forkScore ?? 0));
+    return Array.from(this.#forks.values()).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   }
 
   canLoadMore(): boolean {
@@ -210,7 +224,7 @@ export class API {
     return this.repo;
   }
 
-  async getForks(count: Number): Promise<Repo[]> {
+  async getNextForks(count: Number): Promise<Repo[]> {
     if (!this.canLoadMore()) {
       return [];
     }
@@ -228,19 +242,37 @@ export class API {
     var forkRepos: Fork[] = rawForks.repository.forks.nodes.map((fork: any) => {
       return {
         ...flattenRepo(fork),
-        diff: flattenDiff(fork.defaultBranchRef),
+        diff: flattenDiffWithoutCommits(fork, repo),
       }
     });
-    forkRepos = forkRepos.map((f: Fork) => {
-      return {
-        ...f,
-        extendedInfo: extendedForkInfo(f, repo)
-      }
-    })
 
     this.#mergeForks(forkRepos);
 
     return forkRepos;
+  }
+
+
+  async getDiffCommits(id?: string) {
+    const repos: Repo[] = [];
+    if (id) {
+      const idRepo = this.#forks.get(id);
+      if (idRepo && idRepo.diff.commits === undefined) {
+        repos.push(idRepo);
+      }
+    }
+    const additionalRepos = Array.from(this.#forks.values())
+      .filter(f => f.id != id && f.diff.commits === undefined && f.diff.aheadBy > 0);
+    repos.push(...additionalRepos.slice(0, 10));
+    const query = this.#buildDiffCommitsQuery(repos);
+
+    const response = await this.#octokit.graphql(query, { ...this.#query });
+    const commits = flattenCommits(response);
+
+    for (let c of commits) {
+      const repo = this.#forks.get(c.repoId);
+      if (!repo) { continue };
+      repo.diff.commits = c.commits;
+    }
   }
 
   #mergeForks(forks: Fork[]) {
@@ -249,8 +281,18 @@ export class API {
       return;
     }
     for (const fork of forks) {
-      fork.forkScore = score(fork, this.repo);
+      fork.score = score(fork, this.repo);
       this.#forks.set(fork.id, fork);
     }
+  }
+
+  #buildDiffCommitsQuery(forks: Repo[]): string {
+    const forkQueries = [];
+    for (let i = 0; i < forks.length; i++) {
+      const fork = forks[i];
+      const headRef = `${fork.owner}:${fork.name}:${fork.defaultBranch}`;
+      forkQueries.push(`fork${i}` + queries.commits.segment1 + headRef + queries.commits.segment2);
+    }
+    return queries.commits.head + forkQueries.join() + queries.commits.tail;
   }
 }
