@@ -2,6 +2,8 @@
 
 Find **sp**ecial **forks** of GitHub projects.
 
+**This project is very much work in progress.**
+
 ## Development setup
 
 1. Copy `.env.example` to `.env.development` and change the variables appropriately.
