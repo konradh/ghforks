@@ -53,9 +53,14 @@ function updateFromInput() {
     update(repo);
 }
 
-function updateFromHash() {
-    const repo = parseRepo(window.location.hash.substring(1));
-    update(repo);
+function updateURL() {
+    const url = new URL(window.location.toString());
+    const owner = url.searchParams.get("owner");
+    const name = url.searchParams.get("repo");
+    if (name && owner) {
+        const repo = parseRepo(owner + "/" + name);
+        update(repo);
+    }
 }
 
 function update(repo: RepoQuery | null) {
@@ -63,16 +68,16 @@ function update(repo: RepoQuery | null) {
         return;
     }
     validate();
-    const asString = `${repo.owner}/${repo.name}`;
-    input.value = asString;
-    window.location.hash = asString;
+    input.value = repo.owner + "/" + repo.name;
+    const currentURL = new URL(window.location.toString());
+    currentURL.searchParams.set("owner", repo.owner);
+    currentURL.searchParams.set("repo", repo.name);
+    window.history.pushState({}, "", currentURL.toString());
     emit("change", repo);
 }
 
-window.onhashchange = updateFromHash;
-
 onMounted(async () => {
     validate();
-    updateFromHash();
+    updateURL();
 })
 </script>
