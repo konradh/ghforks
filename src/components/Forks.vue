@@ -4,12 +4,12 @@
         <i class="fa-solid fa-spinner fa-spin"></i> loading
     </div>
     <div v-if="repo">
-        <h2>Forks<template v-if="repo"> ({{ forks.length }} of {{ repo.publicForkCount
+        <h2>Forks<template v-if="repo"> ({{ forks.length }} of {{ repo.forks.public
                 }})</template></h2>
         <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
             :loadingText="loadingText" class="align-center">
         </LoadMoreButton>
-        <div v-if="!loading && repo && repo.publicForkCount === 0">
+        <div v-if="!loading && repo && repo.forks.public === 0">
             This repository has no public forks.
         </div>
         <div v-else>

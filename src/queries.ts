@@ -3,29 +3,46 @@ import { RepoQuery, Repo, Fork, PageInfo, Diff, Commit } from './types';
 import { score } from "./score";
 
 
-const queries = {
-  repo: `query Repo($owner: String!, $name: String!, $cursor: String) {
-  repository(name: $name, owner: $owner) {
-    owner {
-      login
-    }
-    url
+const fragmentRepoInfo = `fragment RepoInfo on Repository {
+  id
+  owner {
+    login
+  }
+  url
+  name
+  description
+  watchers {
+    totalCount
+  }
+  stargazers {
+    totalCount
+  }
+  pushedAt
+  forkCount
+  publicForks: forks(privacy: PUBLIC) {
+    totalCount
+  }
+  defaultBranchRef {
     name
-    description
-    watchers {
-      totalCount
-    }
-    stargazers {
-      totalCount
-    }
-    pushedAt
-    forkCount
-    forks(privacy: PUBLIC) {
-      totalCount
-    }
-    defaultBranchRef {
-      name
-    }
+  }
+  openIssues: issues(states:OPEN) {
+    totalCount
+  }
+  closedIssues: issues(states:CLOSED) {
+    totalCount
+  }
+  openPRs: pullRequests(states: OPEN) {
+    totalCount
+  }
+  closedPRs: pullRequests(states: [CLOSED, MERGED]) {
+    totalCount
+  } 
+}
+  `;
+const queryRepo = `${fragmentRepoInfo}
+query Repo($owner: String!, $name: String!, $cursor: String) {
+  repository(name: $name, owner: $owner) {
+    ...RepoInfo
     refs(
       refPrefix: "refs/heads/"
       orderBy: { field: TAG_COMMIT_DATE, direction: DESC }
@@ -42,8 +59,9 @@ const queries = {
       }
     }
   }
-}`,
-  forks: `query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
+}`;
+const queryForks = `${fragmentRepoInfo}
+query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
   repository(name: $name, owner: $owner) {
     forks(
       first: $count
@@ -57,24 +75,7 @@ const queries = {
       }
       totalCount
       nodes {
-        id
-        owner {
-          login
-        }
-        url
-        name
-        description
-        watchers {
-          totalCount
-        }
-        stargazers {
-          totalCount
-        }
-        pushedAt
-        forkCount
-        forks(privacy: PUBLIC) {
-          totalCount
-        }
+        ...RepoInfo,
         refs(
           refPrefix: "refs/heads/"
           orderBy: {field: TAG_COMMIT_DATE, direction: DESC}
@@ -99,9 +100,9 @@ const queries = {
       }
     }
   }
-}`,
-  commits: {
-    head: `fragment Commits on Comparison {
+}`;
+const queryCommits = {
+  head: `fragment Commits on Comparison {
   headTarget {
     repository {
       id
@@ -122,18 +123,17 @@ query DiffCommits($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
     defaultBranchRef {
 `,
-    segment1: `: compare(headRef: "`,
-    segment2: `") {
+  segment1: `: compare(headRef: "`,
+  segment2: `") {
         ...Commits
       }
       `,
-    tail: `
+  tail: `
     }
   }
 }
 `,
-  },
-}
+};
 
 function flattenRepo(r: any): Repo {
   return {
@@ -145,10 +145,20 @@ function flattenRepo(r: any): Repo {
     pushedAt: new Date(r.pushedAt),
 
     forkCount: r.forkCount,
-    publicForkCount: r.forks.totalCount,
-    privateForkCount: r.forkCount - r.forks.totalCount,
+    forks: {
+      public: r.publicForks.totalCount,
+      private: r.forkCount - r.publicForks.totalCount,
+    },
     stars: r.stargazers.totalCount,
     watchers: r.watchers.totalCount,
+    issues: {
+      open: r.openIssues.totalCount,
+      closed: r.closedIssues.totalCount,
+    },
+    pullRequests: {
+      open: r.openPRs.totalCount,
+      closed: r.closedPRs.totalCount,
+    },
 
     defaultBranch: r.defaultBranchRef.name,
 
@@ -216,7 +226,7 @@ export class API {
   }
 
   canLoadMore(): boolean {
-    if (this.repo?.publicForkCount === 0) {
+    if (this.repo?.forks.public === 0) {
       return false;
     }
     return !this.#forksCursor || this.#forksCursor.hasNextPage;
@@ -226,7 +236,7 @@ export class API {
     if (this.repo) {
       return this.repo;
     }
-    const r = await this.#octokit.graphql.paginate(queries.repo, { ...this.#query });
+    const r = await this.#octokit.graphql.paginate(queryRepo, { ...this.#query });
     this.repo = flattenRepo(r.repository);
     return this.repo;
   }
@@ -236,10 +246,10 @@ export class API {
       return [];
     }
     const repo = await this.getRepo();
-    if (!repo || repo.publicForkCount === 0) {
+    if (!repo || repo.forks.public === 0) {
       return [];
     }
-    const rawForks: any = await this.#octokit.graphql(queries.forks, {
+    const rawForks: any = await this.#octokit.graphql(queryForks, {
       ...this.#query,
       baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
       cursor: this.#forksCursor?.endCursor ?? null,
@@ -288,7 +298,7 @@ export class API {
       return;
     }
     for (const fork of forks) {
-      fork.score = score(fork, this.repo);
+      fork.score = score(fork);
       this.#forks.set(fork.id, fork);
     }
   }
@@ -298,8 +308,8 @@ export class API {
     for (let i = 0; i < forks.length; i++) {
       const fork = forks[i];
       const headRef = `${fork.owner}:${fork.name}:${fork.defaultBranch}`;
-      forkQueries.push(`fork${i}` + queries.commits.segment1 + headRef + queries.commits.segment2);
+      forkQueries.push(`fork${i}` + queryCommits.segment1 + headRef + queryCommits.segment2);
     }
-    return queries.commits.head + forkQueries.join() + queries.commits.tail;
+    return queryCommits.head + forkQueries.join() + queryCommits.tail;
   }
 }

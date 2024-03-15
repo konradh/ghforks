@@ -15,13 +15,14 @@ export interface Repo {
     description: string,
     url: string,
     pushedAt: Date,
-    privateForkCount: number,
-    publicForkCount: number,
     forkCount: number,
     stars: number,
     watchers: number,
     defaultBranch: string,
     branches: string[],
+    issues: { open: number, closed: number },
+    pullRequests: { open: number, closed: number },
+    forks: { public: number, private: number }
 };
 
 export interface Commit {
