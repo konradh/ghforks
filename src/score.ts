@@ -7,12 +7,14 @@ function f(x: number, half: number = 1, offset: number = 0): number {
 }
 
 export function score(fork: Fork): number {
-    if (fork.diff.aheadBy == 0 && fork.diff.newBranches.length == 0) {
+    if (fork.diff.aheadBy === 0 && fork.diff.newBranches.length === 0) {
         return -Infinity;
     }
 
     var branchesScore = fork.diff.newBranches.map((b: Branch) => f(b.aheadBy)).reduce((a, b) => a + b, 0);
-    branchesScore /= fork.diff.newBranches.length;
+    if (fork.diff.newBranches.length > 1) {
+        branchesScore /= fork.diff.newBranches.length;
+    }
 
     return 3 * f(fork.diff.aheadBy) // new content is good
         + branchesScore // new branches are good
