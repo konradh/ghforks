@@ -89,8 +89,6 @@ const forks = ref<ForkType[]>([]);
 const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.score !== -Infinity));
 const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.score || f.score === -Infinity));
 
-const batchSize = 50;
-
 async function loadMore() {
     if (!api) {
         return;
@@ -108,7 +106,7 @@ async function loadMore() {
     }
     do {
         loadingText.value = "loading forks...";
-        await api.getNextForks(batchSize);
+        await api.getNextForks();
         forks.value = api.forks()
     }
     while (keepLoading.value && api.canLoadMore());

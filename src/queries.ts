@@ -79,7 +79,7 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
         refs(
           refPrefix: "refs/heads/"
           orderBy: {field: TAG_COMMIT_DATE, direction: DESC}
-          first: 100
+          first: 20
         ) {
           totalCount
           nodes {
@@ -109,7 +109,7 @@ const queryCommits = {
       url
     }
   }
-  commits(first: 50) {
+  commits(first: 20) {
     nodes {
       oid
       messageHeadline
@@ -241,7 +241,7 @@ export class API {
     return this.repo;
   }
 
-  async getNextForks(count: Number): Promise<Repo[]> {
+  async getNextForks(): Promise<Repo[]> {
     if (!this.canLoadMore()) {
       return [];
     }
@@ -253,7 +253,7 @@ export class API {
       ...this.#query,
       baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
       cursor: this.#forksCursor?.endCursor ?? null,
-      count: count
+      count: 20
     });
     this.#forksCursor = rawForks.repository.forks.pageInfo;
     var forkRepos: Fork[] = rawForks.repository.forks.nodes.map((fork: any) => {
