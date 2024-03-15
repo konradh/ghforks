@@ -86,8 +86,8 @@ const keepLoading = ref(false);
 
 const repo = ref<RepoType | null>(null);
 const forks = ref<ForkType[]>([]);
-const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.score && f.score > 0));
-const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.score || f.score <= 0));
+const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.score !== -Infinity));
+const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.score || f.score === -Infinity));
 
 const batchSize = 50;
 

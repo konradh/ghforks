@@ -7,8 +7,8 @@
                 <span>branches not present in parent:</span>
                 <div>
                     <template v-for="(branch, idx) in fork.diff?.newBranches" :key="branch">
-                        <a :href="`${fork.url}/tree/${branch}`" target="_blank">
-                            {{ branch }}
+                        <a :href="`${fork.url}/tree/${branch.name}`" target="_blank">
+                            {{ branch.name }}
                         </a><template v-if="idx != fork.diff?.newBranches.length - 1">, </template>
                     </template>
                 </div>
@@ -17,7 +17,10 @@
         <div v-if="fork.diff && fork.diff?.aheadBy > 0">
             <details class="commits" @toggle="toggleCommits">
                 <summary>
-                    {{ fork.diff.aheadBy }} ahead, {{ fork.diff.behindBy }} behind.
+                    <template v-if="fork.diff.aheadBy > 0">{{ fork.diff.aheadBy }} ahead</template>
+                    <template v-if="fork.diff.aheadBy > 0 && fork.diff.behindBy > 0">, </template>
+                    <template v-if="fork.diff.behindBy > 0">{{ fork.diff.behindBy }} behind</template>
+                    <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to date</template>.
                 </summary>
                 <ul v-if="fork.diff.commits">
                     <li v-for="commit in fork.diff.commits" :key="commit.commitId">
@@ -33,7 +36,10 @@
             </details>
         </div>
         <div v-else-if="fork.diff">
-            {{ fork.diff.aheadBy }} ahead, {{ fork.diff.behindBy }} behind.
+            <template v-if="fork.diff.aheadBy > 0">{{ fork.diff.aheadBy }} ahead</template>
+            <template v-if="fork.diff.aheadBy > 0 && fork.diff.behindBy > 0">, </template>
+            <template v-if="fork.diff.behindBy > 0">{{ fork.diff.behindBy }} behind</template>
+            <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to date</template>.
         </div>
     </div>
 </template>

@@ -15,8 +15,3 @@ export function timeDiffApprox(date: Date): string {
     const years = days / 365;
     return `${Math.floor(years)} years ago`;
 }
-
-export function listDiff(a: string[], b: string[]): string[] {
-    const bSet = new Set(b);
-    return a.filter(e => !bSet.has(e));
-}

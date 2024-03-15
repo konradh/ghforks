@@ -33,6 +33,12 @@ export interface Commit {
     committedDate: string,
 };
 
+export interface Branch {
+    name: string,
+    aheadBy: number,
+    behindBy: number,
+}
+
 export interface Diff {
     base: string,
     head: string,
@@ -42,7 +48,7 @@ export interface Diff {
     commits?: Commit[],
 
     descriptionChanged: boolean,
-    newBranches: string[],
+    newBranches: Branch[],
 };
 
 export interface Fork extends Repo {

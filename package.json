@@ -10,7 +10,6 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.5.1",
     "@octokit/graphql": "^7.0.2",
-    "dompurify": "^3.0.8",
     "octokit": "^3.1.2",
     "octokit-auth-oauth-user-client": "^0.1.6",
     "vue": "^3.3.11"

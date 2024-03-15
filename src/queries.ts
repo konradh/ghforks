@@ -1,12 +1,10 @@
 import { Octokit } from "octokit";
 import { RepoQuery, Repo, Fork, PageInfo, Diff, Commit } from './types';
-import { listDiff } from "./utils";
 import { score } from "./score";
 
 
 const queries = {
-  repo: `
-query Repo($owner: String!, $name: String!, $cursor: String) {
+  repo: `query Repo($owner: String!, $name: String!, $cursor: String) {
   repository(name: $name, owner: $owner) {
     owner {
       login
@@ -45,8 +43,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
     }
   }
 }`,
-  forks: `
-query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
+  forks: `query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
   repository(name: $name, owner: $owner) {
     forks(
       first: $count
@@ -86,6 +83,10 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
           totalCount
           nodes {
             name
+            compare(headRef: $baseRef) {
+              behindBy: aheadBy
+              aheadBy: behindBy
+            }
           }
         }
         defaultBranchRef {
@@ -100,8 +101,7 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
   }
 }`,
   commits: {
-    head: `
-fragment Commits on Comparison {
+    head: `fragment Commits on Comparison {
   headTarget {
     repository {
       id
@@ -111,7 +111,7 @@ fragment Commits on Comparison {
     nodes {
       url
       oid
-      message
+      messageHeadline
       additions
       deletions
       committedDate
@@ -158,13 +158,21 @@ function flattenRepo(r: any): Repo {
 
 function flattenDiffWithoutCommits(fork: any, parent: Repo): Diff {
   const f = flattenRepo(fork);
+  const branches: any = fork.refs.nodes;
+  const parentBranchSet = new Set(parent.branches);
   return {
     base: `${parent.owner}:${parent.name}:${parent.defaultBranch}`,
     head: `${f.owner}:${f.name}:${f.defaultBranch}`,
     aheadBy: fork.defaultBranchRef.compare.aheadBy,
     behindBy: fork.defaultBranchRef.compare.behindBy,
     descriptionChanged: f.description !== parent.description,
-    newBranches: listDiff(f.branches, parent.branches),
+    newBranches: branches
+      .filter((b: any) => (b.compare.aheadBy > 0 && !parentBranchSet.has(b.name)))
+      .map((b: any) => ({
+        name: b.name,
+        aheadBy: b.compare.aheadBy,
+        behindBy: b.compare.behindBy,
+      })),
   }
 }
 
@@ -174,7 +182,6 @@ interface Commits {
 }
 
 function flattenCommits(response: any): Commits[] {
-  console.log(response)
   const repos = Object.values(response.repository.defaultBranchRef);
   return repos.map((commits: any) => {
     return {
@@ -182,7 +189,7 @@ function flattenCommits(response: any): Commits[] {
       commits: commits.commits.nodes.map((commit: any) => ({
         url: commit.url,
         commitId: commit.oid,
-        message: commit.message,
+        message: commit.messageHeadline,
         additions: commit.additions,
         deletions: commit.deletions,
         committedDate: commit.committedDate,
