@@ -105,11 +105,11 @@ const queries = {
   headTarget {
     repository {
       id
+      url
     }
   }
   commits(first: 50) {
     nodes {
-      url
       oid
       messageHeadline
       additions
@@ -187,7 +187,7 @@ function flattenCommits(response: any): Commits[] {
     return {
       repoId: commits.headTarget.repository.id,
       commits: commits.commits.nodes.map((commit: any) => ({
-        url: commit.url,
+        url: `${commits.headTarget.repository.url}/commit/${commit.oid}`,
         commitId: commit.oid,
         message: commit.messageHeadline,
         additions: commit.additions,
