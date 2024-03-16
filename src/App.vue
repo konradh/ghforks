@@ -5,13 +5,13 @@
       <p>Find <b>sp</b>ecial <b>forks</b> of GitHub projects.</p>
     </div>
     <div class=align-center>
-      <Authorization @signin="signIn"></Authorization>
+      <Auth @login="signIn"></Auth>
     </div>
     <Faq></Faq>
   </template>
   <template v-else>
     <div class="align-right">
-      <Authorization @signout="signOut"></Authorization>
+      <Auth @logout="signOut"></Auth>
       <div id="repo-input" class="align-center">
         <RepoInput v-on:change="update"></RepoInput>
       </div>
@@ -24,7 +24,7 @@
 import { ref } from 'vue';
 
 import RepoInput from './components/RepoInput.vue'
-import Authorization from './components/Authorization.vue';
+import Auth from './components/Auth.vue';
 import Faq from './components/Faq.vue';
 import Forks from './components/Forks.vue';
 
@@ -36,9 +36,9 @@ const authorized = ref(false);
 const octokit = ref<Octokit | null>(null);
 const repoQuery = ref<RepoQuery | null>(null)
 
-function signIn(ok: Octokit) {
+function signIn(token: string) {
   authorized.value = true;
-  octokit.value = ok;
+  octokit.value = new Octokit({auth: token});
 }
 
 function signOut() {
