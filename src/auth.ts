@@ -15,6 +15,7 @@ interface TokenValidity {
 const storageKeyTokenVerified = "token-verified";
 const storageKeyToken = "token";
 const storageKeyOAuthState = "oauth-state";
+const storageKeyUrl = "oauth-stored-url";
 
 // Get the stored token, if one exists.
 export async function getToken(): Promise<string | null> {
@@ -75,6 +76,7 @@ export function oauthLogin() {
     const state = window.crypto.getRandomValues(new Uint8Array(8))
         .reduce((a, b) => a + b.toString(16).padStart(2, "0"), "");
     sessionStorage.setItem(storageKeyOAuthState, state);
+    sessionStorage.setItem(storageKeyUrl, document.location.toString());
 
     const url = new URL(oauthProxyUrl + "/api/github/oauth/login");
     url.searchParams.set("client_id", clientId);
@@ -105,10 +107,17 @@ export async function oauthCallback(): Promise<boolean> {
     }
     sessionStorage.removeItem(storageKeyOAuthState);
 
-    // Remove state and code from url.
+    // Remove state and code from URL.
     callbackUrl.searchParams.delete("code");
     callbackUrl.searchParams.delete("state");
     window.history.replaceState({}, "", callbackUrl);
+
+    // Restore previous URL.
+    const storedUrl = sessionStorage.getItem(storageKeyUrl);
+    sessionStorage.removeItem(storageKeyUrl)
+    if (storedUrl) {
+        window.history.replaceState({}, "", storedUrl);
+    }
 
     // Fetch the token.
     const res = await fetch(oauthProxyUrl + "/api/github/oauth/token", {
