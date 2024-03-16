@@ -4,8 +4,10 @@
         <i class="fa-solid fa-spinner fa-spin"></i> loading
     </div>
     <div v-if="repo">
-        <h2>Forks<template v-if="repo"> ({{ forks.length }} of {{ repo.forks.public
-                }})</template></h2>
+        <h2>
+            Forks<template v-if="repo">
+                ({{ forks.length }} of {{ repo.forks.public }})</template>
+        </h2>
         <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
             :loadingText="loadingText" class="align-center">
         </LoadMoreButton>
@@ -53,31 +55,24 @@
 </style>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from "vue";
 
-import Repo from './repo/Repo.vue';
-import Fork from './repo/Fork.vue';
-import LoadMoreButton from './LoadMoreButton.vue';
+import Repo from "./repo/Repo.vue";
+import Fork from "./repo/Fork.vue";
+import LoadMoreButton from "./LoadMoreButton.vue";
 
+import { API } from "../queries";
+import { Octokit } from "octokit";
+import { RepoQuery, Fork as ForkType, Repo as RepoType } from "../types";
 
-import { API } from '../queries';
-import { Octokit } from 'octokit';
-import { RepoQuery, Fork as ForkType, Repo as RepoType } from '../types';
-
-const props = defineProps<{ octokit: Octokit | null, query: RepoQuery | null }>();
+const props = defineProps<{
+    octokit: Octokit | null;
+    query: RepoQuery | null;
+}>();
 var api: API | null = null;
 
-watch(() => props.query, async () => {
-    repo.value = null;
-    forks.value = [];
-    loading.value = false;
-    if (props.query && props.octokit) {
-        keepLoading.value = false;
-        api = new API(props.octokit, props.query);
-        loadMore();
-    }
-});
-
+watch(() => props.query, loadInitial);
+onMounted(loadInitial);
 
 const loading = ref(false);
 const loadingText = ref("");
@@ -86,8 +81,23 @@ const keepLoading = ref(false);
 
 const repo = ref<RepoType | null>(null);
 const forks = ref<ForkType[]>([]);
-const usefulForks = computed(() => forks.value.filter((f: ForkType) => f.score !== -Infinity));
-const uselessForks = computed(() => forks.value.filter((f: ForkType) => !f.score || f.score === -Infinity));
+const usefulForks = computed(() =>
+    forks.value.filter((f: ForkType) => f.score !== -Infinity)
+);
+const uselessForks = computed(() =>
+    forks.value.filter((f: ForkType) => !f.score || f.score === -Infinity)
+);
+
+async function loadInitial() {
+    repo.value = null;
+    forks.value = [];
+    loading.value = false;
+    if (props.query && props.octokit) {
+        keepLoading.value = false;
+        api = new API(props.octokit, props.query);
+        loadMore();
+    }
+}
 
 async function loadMore() {
     if (!api) {
@@ -107,9 +117,8 @@ async function loadMore() {
     do {
         loadingText.value = "loading forks...";
         await api.getNextForks();
-        forks.value = api.forks()
-    }
-    while (keepLoading.value && api.canLoadMore());
+        forks.value = api.forks();
+    } while (keepLoading.value && api.canLoadMore());
 
     loading.value = false;
     loadingText.value = "load more";

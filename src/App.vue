@@ -1,52 +1,85 @@
 <template>
-  <template v-if="!authorized">
-    <div class="text">
-      <h1>GitHub Sporks</h1>
-      <p>Find <b>sp</b>ecial <b>forks</b> of GitHub projects.</p>
-    </div>
-    <div class=align-center>
-      <Auth @login="signIn"></Auth>
-    </div>
-    <Faq></Faq>
-  </template>
+  <header>
+    <a @click="repoQuery = null" href="/" class="no-highlight">
+      <h2>GitHub Sporks</h2>
+    </a>
+    <Auth v-if="authenticated" @logout="logout"></Auth>
+  </header>
+  <div v-if="authenticated" class="align-center">
+    <RepoInput @change="update"></RepoInput>
+  </div>
+  <Forks v-if="repoQuery && authenticated" :octokit="octokit" :query="repoQuery"></Forks>
   <template v-else>
-    <div class="align-right">
-      <Auth @logout="signOut"></Auth>
-      <div id="repo-input" class="align-center">
-        <RepoInput v-on:change="update"></RepoInput>
+    <div class="text">
+      <p>Find <b>sp</b>ecial <b>forks</b> of GitHub projects.</p>
+      <div v-if="!authenticated" class="align-center">
+        <Auth @login="login"></Auth>
       </div>
+      <Faq></Faq>
     </div>
-    <Forks :octokit="octokit" :query="repoQuery"></Forks>
   </template>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue';
-
-import RepoInput from './components/RepoInput.vue'
-import Auth from './components/Auth.vue';
-import Faq from './components/Faq.vue';
-import Forks from './components/Forks.vue';
-
-
-import { Octokit } from 'octokit';
-import { RepoQuery } from './types';
-
-const authorized = ref(false);
-const octokit = ref<Octokit | null>(null);
-const repoQuery = ref<RepoQuery | null>(null)
-
-function signIn(token: string) {
-  authorized.value = true;
-  octokit.value = new Octokit({auth: token});
+<style scoped lang="scss">
+body {
+  box-sizing: border-box;
 }
 
-function signOut() {
-  authorized.value = false;
+header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  column-gap: 0.5em;
+
+  >* {
+    margin: auto;
+  }
+
+  :nth-child(1) {
+    grid-column-start: 2;
+  }
+
+  :nth-child(2) {
+    margin-left: auto;
+    margin-right: 0;
+  }
+}
+</style>
+
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+
+import RepoInput from "./components/RepoInput.vue";
+import Auth from "./components/Auth.vue";
+import Faq from "./components/Faq.vue";
+import Forks from "./components/Forks.vue";
+
+import { Octokit } from "octokit";
+import { RepoQuery } from "./types";
+import * as auth from "./auth";
+
+const authenticated = ref(false);
+const octokit = ref<Octokit | null>(null);
+const repoQuery = ref<RepoQuery | null>(null);
+
+function login(token: string) {
+  authenticated.value = true;
+  octokit.value = new Octokit({ auth: token });
+}
+
+function logout() {
+  authenticated.value = false;
   octokit.value = null;
 }
 
 function update(query: RepoQuery) {
+  console.log("queried", query);
   repoQuery.value = query;
 }
+
+onMounted(async () => {
+  const token = await auth.getToken();
+  if (token) {
+    octokit.value = new Octokit({ auth: token });
+  }
+});
 </script>

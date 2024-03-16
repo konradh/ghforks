@@ -1,6 +1,9 @@
 <template>
-    <input type="text" v-model="input" @keydown.enter="updateFromInput()" @input="validate()" placeholder="owner/repo"
-        :class="[isValid ? '' : 'invalid']">
+    <div class="input">
+        <input type="text" v-model="input" @keydown.enter="updateFromInput()" @input="validate()"
+            placeholder="owner/repo" :class="[isValid ? '' : 'invalid']" />
+        <button @click="updateFromInput()" :disabled="!isValid || !input">Go</button>
+    </div>
 </template>
 
 <style scoped lang="scss">
@@ -11,21 +14,41 @@
         box-shadow: 0 0 0.5em 0.3em red;
     }
 }
-</style>
 
-<style scoped>
+.input {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    height: 3em;
+    margin: 1em;
+
+    >* {
+        box-sizing: border-box;
+        border: 1px solid black;
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+}
+
 input {
-    width: 100%;
+    width: 30em;
+    border-radius: 0.5em 0 0 0.5em;
+}
+
+button {
+    border-radius: 0 0.5em 0.5em 0;
 }
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { RepoQuery } from '../types';
+import { ref, onMounted } from "vue";
+import { RepoQuery } from "../types";
 
 const emit = defineEmits<{ (e: "change", value: RepoQuery): void }>();
 
-const repoRegex = new RegExp("/?(?<owner>[A-Za-z0-9_.-]+)/(?<name>[A-Za-z0-9_.-]+)$");
+const repoRegex = new RegExp(
+    "/?(?<owner>[A-Za-z0-9_.-]+)/(?<name>[A-Za-z0-9_.-]+)$"
+);
 const input = ref("");
 const isValid = ref(false);
 
@@ -50,7 +73,9 @@ function validate() {
 
 function updateFromInput() {
     const repo = parseRepo(input.value);
-    update(repo);
+    if (repo) {
+        update(repo);
+    }
 }
 
 function updateURL() {
@@ -59,14 +84,13 @@ function updateURL() {
     const name = url.searchParams.get("repo");
     if (name && owner) {
         const repo = parseRepo(owner + "/" + name);
-        update(repo);
+        if (repo) {
+            update(repo);
+        }
     }
 }
 
-function update(repo: RepoQuery | null) {
-    if (!repo) {
-        return;
-    }
+function update(repo: RepoQuery) {
     validate();
     input.value = repo.owner + "/" + repo.name;
     const currentURL = new URL(window.location.toString());
@@ -79,5 +103,5 @@ function update(repo: RepoQuery | null) {
 onMounted(async () => {
     validate();
     updateURL();
-})
+});
 </script>
