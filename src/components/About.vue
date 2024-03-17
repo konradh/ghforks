@@ -1,5 +1,5 @@
 <template>
-    <p>Find <b>sp</b>ecial <b>forks</b> of GitHub projects.</p>
+    <p>Find useful forks of GitHub repositories.</p>
     <div class="faq">
         <h2>FAQ</h2>
         <details>

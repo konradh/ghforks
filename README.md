@@ -1,6 +1,6 @@
-# GitHub Sporks
+# ghforks
 
-Find **sp**ecial **forks** of GitHub projects.
+Find useful of GitHub repositories.
 
 **This project is very much work in progress.**
 

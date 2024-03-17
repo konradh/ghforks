@@ -1,7 +1,7 @@
 <template>
   <header>
     <a @click="repoQuery = null" href="/" class="no-highlight">
-      <h1>GitHub Sporks</h1>
+      <h1>ghforks</h1>
     </a>
     <Auth v-if="authenticated" @logout="logout"></Auth>
   </header>
