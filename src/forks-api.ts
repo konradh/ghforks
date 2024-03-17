@@ -1,4 +1,4 @@
-import { Octokit } from "octokit";
+import { GithubAPI } from './github-api';
 import { RepoQuery, Repo, Fork, PageInfo, Diff, Commit } from './types';
 import { score } from "./score";
 
@@ -208,16 +208,16 @@ function flattenCommits(response: any): Commits[] {
   })
 }
 
-export class API {
+export class ForksAPI {
   #query: RepoQuery;
   #forksCursor: PageInfo | null = null;
-  #octokit: Octokit
+  #api: GithubAPI
   repo: Repo | null = null;
   #forks: Map<string, Fork>;
 
-  constructor(octokit: Octokit, query: RepoQuery) {
+  constructor(api: GithubAPI, query: RepoQuery) {
     this.#query = query;
-    this.#octokit = octokit;
+    this.#api = api;
     this.#forks = new Map<string, Fork>()
   }
 
@@ -236,7 +236,7 @@ export class API {
     if (this.repo) {
       return this.repo;
     }
-    const r = await this.#octokit.graphql.paginate(queryRepo, { ...this.#query });
+    const r = await this.#api.graphql(queryRepo, { ...this.#query }); // TODO: paginate
     this.repo = flattenRepo(r.repository);
     return this.repo;
   }
@@ -249,7 +249,7 @@ export class API {
     if (!repo || repo.forks.public === 0) {
       return [];
     }
-    const rawForks: any = await this.#octokit.graphql(queryForks, {
+    const rawForks: any = await this.#api.graphql(queryForks, {
       ...this.#query,
       baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
       cursor: this.#forksCursor?.endCursor ?? null,
@@ -282,7 +282,7 @@ export class API {
     repos.push(...additionalRepos.slice(0, 10));
     const query = this.#buildDiffCommitsQuery(repos);
 
-    const response = await this.#octokit.graphql(query, { ...this.#query });
+    const response = await this.#api.graphql(query, { ...this.#query });
     const commits = flattenCommits(response);
 
     for (let c of commits) {

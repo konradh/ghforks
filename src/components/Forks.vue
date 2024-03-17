@@ -86,15 +86,15 @@ import Repo from "./repo/Repo.vue";
 import Fork from "./repo/Fork.vue";
 import LoadMoreButton from "./LoadMoreButton.vue";
 
-import { API } from "../queries";
-import { Octokit } from "octokit";
+import { ForksAPI } from "../forks-api";
 import { RepoQuery, Fork as ForkType, Repo as RepoType } from "../types";
+import { GithubAPI } from "../github-api";
 
 const props = defineProps<{
-    octokit: Octokit | null;
+    githubAPI: GithubAPI | null;
     query: RepoQuery | null;
 }>();
-var api: API | null = null;
+var api: ForksAPI | null = null;
 
 watch(() => props.query, loadInitial);
 onMounted(loadInitial);
@@ -117,9 +117,9 @@ async function loadInitial() {
     repo.value = null;
     forks.value = [];
     loading.value = false;
-    if (props.query && props.octokit) {
+    if (props.query && props.githubAPI) {
         keepLoading.value = false;
-        api = new API(props.octokit, props.query);
+        api = new ForksAPI(props.githubAPI, props.query);
         loadMore();
     }
 }

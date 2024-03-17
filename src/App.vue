@@ -8,7 +8,7 @@
   <div v-if="authenticated" class="align-center">
     <RepoInput @change="update"></RepoInput>
   </div>
-  <Forks v-if="repoQuery && authenticated" :octokit="octokit" :query="repoQuery"></Forks>
+  <Forks v-if="repoQuery && authenticated" :githubAPI="githubAPI" :query="repoQuery"></Forks>
   <template v-else>
     <div class="text">
       <div v-if="!authenticated" class="align-center">
@@ -52,33 +52,33 @@ import Auth from "./components/Auth.vue";
 import About from "./components/About.vue";
 import Forks from "./components/Forks.vue";
 
-import { Octokit } from "octokit";
 import { RepoQuery } from "./types";
 import * as auth from "./auth";
+import { GithubAPI } from "./github-api";
 
 const authenticated = ref(false);
-const octokit = ref<Octokit | null>(null);
+const githubAPI = ref<GithubAPI | null>(null);
 const repoQuery = ref<RepoQuery | null>(null);
 
 function login(token: string) {
   authenticated.value = true;
-  octokit.value = new Octokit({ auth: token });
+  githubAPI.value = new GithubAPI(token);
 }
 
 function logout() {
   authenticated.value = false;
-  octokit.value = null;
+  githubAPI.value = null;
 }
 
 function update(query: RepoQuery) {
-  console.log("queried", query);
   repoQuery.value = query;
 }
 
 onMounted(async () => {
   const token = await auth.getToken();
   if (token) {
-    octokit.value = new Octokit({ auth: token });
+    githubAPI.value = new GithubAPI(token);
+    console.log(typeof (githubAPI))
   }
 });
-</script>./components/About.vue
+</script>
