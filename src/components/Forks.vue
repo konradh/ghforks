@@ -1,16 +1,18 @@
 <template>
     <Repo v-if="repo" :repo="repo"></Repo>
     <div v-else-if="loading" class="align-center">
-        <i class="fa-solid fa-spinner fa-spin"></i> loading
+        <i class="fa-solid fa-spinner fa-spin"></i> Loading...
     </div>
     <div v-if="repo">
         <h2>
             Forks<template v-if="repo">
                 ({{ forks.length }} of {{ repo.forks.public }})</template>
         </h2>
-        <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
-            :loadingText="loadingText" class="align-center">
-        </LoadMoreButton>
+        <div class="align-center">
+            <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
+                :loadingText="loadingText">
+            </LoadMoreButton>
+        </div>
         <div v-if="!loading && repo && repo.forks.public === 0">
             This repository has no public forks.
         </div>
@@ -20,7 +22,7 @@
                     <Fork :fork="fork" @requestCommits="loadCommits"></Fork>
                 </template>
             </TransitionGroup>
-            <details v-if="uselessForks.length > 0">
+            <details v-if="uselessForks.length > 0" id="useless">
                 <summary>{{ uselessForks.length }} useless forks</summary>
                 <TransitionGroup name="list">
                     <template v-for="fork in uselessForks" :key="fork.id">
@@ -29,9 +31,11 @@
                 </TransitionGroup>
             </details>
         </div>
-        <LoadMoreButton v-if="canLoadMore && forks.length > 0" @click="loadMore" v-model="keepLoading"
-            :loading="loading" :loadingText="loadingText" class="align-center">
-        </LoadMoreButton>
+        <div class="align-center">
+            <LoadMoreButton v-if="canLoadMore && forks.length > 0" @click="loadMore" v-model="keepLoading"
+                :loading="loading" :loadingText="loadingText">
+            </LoadMoreButton>
+        </div>
     </div>
 </template>
 
@@ -51,6 +55,27 @@
 
 .list-leave-active {
     position: absolute;
+}
+
+details#useless {
+    margin: 0.5em;
+
+    >summary {
+        width: fit-content;
+        margin: auto;
+        padding: 0.5em;
+        border: 1px solid black;
+        border-radius: 0.5em;
+        background-color: #e9e9ed;
+    }
+
+    >summary::before {
+        content: "show "
+    }
+
+    &[open]>summary::before {
+        content: "hide "
+    }
 }
 </style>
 
@@ -115,13 +140,13 @@ async function loadMore() {
         return;
     }
     do {
-        loadingText.value = "loading forks...";
+        loadingText.value = "Loading forks...";
         await api.getNextForks();
         forks.value = api.forks();
     } while (keepLoading.value && api.canLoadMore());
 
     loading.value = false;
-    loadingText.value = "load more";
+    loadingText.value = "Load more";
     canLoadMore.value = api.canLoadMore();
 }
 

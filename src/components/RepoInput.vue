@@ -1,8 +1,8 @@
 <template>
-    <div class="input">
+    <div class="input-set">
         <input type="text" v-model="input" @keydown.enter="updateFromInput()" @input="validate()"
-            placeholder="owner/repo" :class="[isValid ? '' : 'invalid']" />
-        <button @click="updateFromInput()" :disabled="!isValid || !input">Go</button>
+            placeholder="owner/repo or https://github.com/owner/repo" :class="[isValid ? '' : 'invalid']" />
+        <button type="button" @click="updateFromInput()" :disabled="!isValid || !input">Go</button>
     </div>
 </template>
 
@@ -15,16 +15,11 @@
     }
 }
 
-.input {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
+div.input-set {
     height: 3em;
     margin: 1em;
 
     >* {
-        box-sizing: border-box;
-        border: 1px solid black;
         padding-left: 1em;
         padding-right: 1em;
     }
@@ -32,11 +27,6 @@
 
 input {
     width: 30em;
-    border-radius: 0.5em 0 0 0.5em;
-}
-
-button {
-    border-radius: 0 0.5em 0.5em 0;
 }
 </style>
 

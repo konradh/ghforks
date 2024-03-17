@@ -1,7 +1,7 @@
 <template>
   <header>
     <a @click="repoQuery = null" href="/" class="no-highlight">
-      <h2>GitHub Sporks</h2>
+      <h1>GitHub Sporks</h1>
     </a>
     <Auth v-if="authenticated" @logout="logout"></Auth>
   </header>
@@ -11,11 +11,10 @@
   <Forks v-if="repoQuery && authenticated" :octokit="octokit" :query="repoQuery"></Forks>
   <template v-else>
     <div class="text">
-      <p>Find <b>sp</b>ecial <b>forks</b> of GitHub projects.</p>
       <div v-if="!authenticated" class="align-center">
         <Auth @login="login"></Auth>
       </div>
-      <Faq></Faq>
+      <About></About>
     </div>
   </template>
 </template>
@@ -50,7 +49,7 @@ import { onMounted, ref } from "vue";
 
 import RepoInput from "./components/RepoInput.vue";
 import Auth from "./components/Auth.vue";
-import Faq from "./components/Faq.vue";
+import About from "./components/About.vue";
 import Forks from "./components/Forks.vue";
 
 import { Octokit } from "octokit";
@@ -82,4 +81,4 @@ onMounted(async () => {
     octokit.value = new Octokit({ auth: token });
   }
 });
-</script>
+</script>./components/About.vue

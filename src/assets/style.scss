@@ -141,3 +141,31 @@ a.repo {
     content: "-";
   }
 }
+
+div.input-set {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+
+  >* {
+    border-radius: 0;
+    border: 1px solid black;
+    border-right: none;
+    box-sizing: border-box;
+  }
+
+  > :first-child {
+    border-radius: 0.5em 0 0 0.5em;
+  }
+
+  > :last-child {
+    border-radius: 0 0.5em 0.5em 0;
+    border-right: 1px solid black;
+  }
+}
+
+button {
+  padding: 0.5em 1em;
+  border-radius: 0.5em;
+  border: 1px solid black;
+}

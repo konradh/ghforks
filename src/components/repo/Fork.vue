@@ -7,7 +7,7 @@
                 <span>branches not present in parent:</span>
                 <div>
                     <template v-for="(branch, idx) in fork.diff?.newBranches" :key="branch">
-                        <a :href="`${fork.url}/tree/${branch.name}`" target="_blank">
+                        <a :href="`${fork.url}/tree/${branch.name}`" target="_blank" class="branch">
                             {{ branch.name }}
                         </a><template v-if="idx != fork.diff?.newBranches.length - 1">, </template>
                     </template>
@@ -20,7 +20,8 @@
                     <template v-if="fork.diff.aheadBy > 0">{{ fork.diff.aheadBy }} ahead</template>
                     <template v-if="fork.diff.aheadBy > 0 && fork.diff.behindBy > 0">, </template>
                     <template v-if="fork.diff.behindBy > 0">{{ fork.diff.behindBy }} behind</template>
-                    <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to date</template>.
+                    <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to
+                        date</template>.
                 </summary>
                 <ul v-if="fork.diff.commits">
                     <li v-for="commit in fork.diff.commits" :key="commit.commitId">
@@ -39,10 +40,17 @@
             <template v-if="fork.diff.aheadBy > 0">{{ fork.diff.aheadBy }} ahead</template>
             <template v-if="fork.diff.aheadBy > 0 && fork.diff.behindBy > 0">, </template>
             <template v-if="fork.diff.behindBy > 0">{{ fork.diff.behindBy }} behind</template>
-            <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to date</template>.
+            <template v-if="fork.diff.aheadBy === 0 && fork.diff.behindBy === 0">Default branch is up to
+                date</template>.
         </div>
     </div>
 </template>
+
+<style scoped>
+.branch {
+    white-space: nowrap;
+}
+</style>
 
 <script setup lang="ts">
 import RepoHead from './RepoHead.vue';
