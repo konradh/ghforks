@@ -1,4 +1,7 @@
 <template>
+    <div v-if="error" class="error">
+        {{ error }}
+    </div>
     <Repo v-if="repo" :repo="repo"></Repo>
     <div v-else-if="loading" class="align-center">
         <i class="fa-solid fa-spinner fa-spin"></i> Loading...
@@ -101,6 +104,7 @@ onMounted(loadInitial);
 
 const loading = ref(false);
 const loadingText = ref("");
+const error = ref<string | null>(null);
 const canLoadMore = ref(false);
 const keepLoading = ref(false);
 
@@ -114,6 +118,7 @@ const uselessForks = computed(() =>
 );
 
 async function loadInitial() {
+    error.value = null;
     repo.value = null;
     forks.value = [];
     loading.value = false;
@@ -125,6 +130,7 @@ async function loadInitial() {
 }
 
 async function loadMore() {
+    error.value = null;
     if (!api) {
         return;
     }
@@ -151,8 +157,9 @@ async function loadMore() {
 }
 
 async function loadCommits(id: string) {
+    error.value = null;
     if (api) {
-        await api.getDiffCommits(id);
+        await api.getForkDetails(id);
         forks.value = api.forks();
     }
 }

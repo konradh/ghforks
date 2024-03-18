@@ -1,10 +1,16 @@
 const githubApiUrl = "https://api.github.com"
 
-export class TimeoutError extends Error { }
+export class TimeoutError extends Error {
+    time: number; // Actual duration of the request in seconds.
+    constructor(time: number) {
+        super("[GraphQL] Timeout");
+        this.time = time;
+    }
+}
 export class GraphqlError extends Error {
     error: any;
     constructor(error: any) {
-        super("GraphQL error: " + JSON.stringify(error, null, 2));
+        super("[GraphQL] " + JSON.stringify(error, null, 2));
         this.error = error;
     }
 }
@@ -42,7 +48,7 @@ export class GithubAPI {
     }
 
     async graphql(query: string, vars?: any) {
-        const startTime = performance.now();
+        const start = performance.now();
         const response = await fetch(githubApiUrl + "/graphql", {
             method: "POST",
             headers: [
@@ -53,8 +59,7 @@ export class GithubAPI {
                 variables: vars
             }),
         });
-        const requestDuration = performance.now() - startTime;
-        console.log(response);
+        const requestDuration = performance.now() - start;
 
         this.rateLimit = parseRateLimit(response.headers);
 
@@ -70,7 +75,7 @@ export class GithubAPI {
                 break;
             case 502:
                 if (requestDuration >= 10000) {
-                    throw new TimeoutError("[GithubAPI] request timeout");
+                    throw new TimeoutError(requestDuration / 1000);
                 }
                 break;
             default:

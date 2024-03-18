@@ -48,10 +48,6 @@ dialog {
 .margin {
     margin: 0.5em;
 }
-
-.error {
-    color: red;
-}
 </style>
 
 <script setup lang="ts">

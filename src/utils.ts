@@ -15,3 +15,7 @@ export function timeDiffApprox(date: Date): string {
     const years = days / 365;
     return `${Math.floor(years)} years ago`;
 }
+
+export function interpolate(a: number, b: number, f: number): number {
+    return a + ((b - a) * f);
+}

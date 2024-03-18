@@ -1,7 +1,7 @@
-import { GithubAPI } from './github-api';
+import { GithubAPI, GraphqlError, TimeoutError } from './github-api';
 import { RepoQuery, Repo, Fork, PageInfo, Diff, Commit } from './types';
 import { score } from "./score";
-
+import { interpolate } from './utils';
 
 const fragmentRepoInfo = `fragment RepoInfo on Repository {
   id
@@ -61,7 +61,7 @@ query Repo($owner: String!, $name: String!, $cursor: String) {
   }
 }`;
 const queryForks = `${fragmentRepoInfo}
-query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $cursor: String) {
+query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $branchCount: Int!, $cursor: String) {
   repository(name: $name, owner: $owner) {
     forks(
       first: $count
@@ -79,7 +79,7 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
         refs(
           refPrefix: "refs/heads/"
           orderBy: {field: TAG_COMMIT_DATE, direction: DESC}
-          first: 20
+          first: $branchCount
         ) {
           totalCount
           nodes {
@@ -101,7 +101,7 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $c
     }
   }
 }`;
-const queryCommits = {
+const queryForkDetails = {
   head: `fragment Commits on Comparison {
   headTarget {
     repository {
@@ -119,7 +119,7 @@ const queryCommits = {
     }
   }
 }
-query DiffCommits($name: String!, $owner: String!) {
+query ForkDetails($name: String!, $owner: String!) {
   repository(name: $name, owner: $owner) {
     defaultBranchRef {
 `,
@@ -191,7 +191,7 @@ interface Commits {
   commits: Commit[],
 }
 
-function flattenCommits(response: any): Commits[] {
+function flattenDetails(response: any): Commits[] {
   const repos = Object.values(response.repository.defaultBranchRef);
   return repos.map((commits: any) => {
     return {
@@ -210,10 +210,21 @@ function flattenCommits(response: any): Commits[] {
 
 export class ForksAPI {
   #query: RepoQuery;
+
   #forksCursor: PageInfo | null = null;
+
   #api: GithubAPI
-  repo: Repo | null = null;
+
+  #repo: Repo | null = null;
   #forks: Map<string, Fork>;
+
+  batchSize = 20;
+  branchCount = 10;
+
+  maxBatchSize = 100; // fixed for the GitHub GraphQL API
+  batchSizeScalingFactor = 0.3;
+  requestDurationTarget = 6; // seconds (maximum is 10 seconds)
+
 
   constructor(api: GithubAPI, query: RepoQuery) {
     this.#query = query;
@@ -226,35 +237,69 @@ export class ForksAPI {
   }
 
   canLoadMore(): boolean {
-    if (this.repo?.forks.public === 0) {
+    if (this.#repo?.forks.public === 0) {
       return false;
     }
     return !this.#forksCursor || this.#forksCursor.hasNextPage;
   }
 
   async getRepo(): Promise<Repo> {
-    if (this.repo) {
-      return this.repo;
+    if (this.#repo) {
+      return this.#repo;
     }
-    const r = await this.#api.graphql(queryRepo, { ...this.#query }); // TODO: paginate
-    this.repo = flattenRepo(r.repository);
-    return this.repo;
+    var r;
+    try {
+      // TODO: paginate branches
+      r = await this.#api.graphql(queryRepo, { ...this.#query });
+    } catch (error) {
+      if (error instanceof GraphqlError) {
+        throw Error(JSON.stringify(error.error));
+      }
+      throw error;
+    }
+    this.#repo = flattenRepo(r.repository);
+    return this.#repo;
   }
 
   async getNextForks(): Promise<Repo[]> {
-    if (!this.canLoadMore()) {
+    const repo = this.#repo;
+    if (!repo) {
+      throw new Error("You must await the result of getRepo once before calling other methods.");
+    }
+
+    if (!this.canLoadMore() || repo.forks.public === 0) {
       return [];
     }
-    const repo = await this.getRepo();
-    if (!repo || repo.forks.public === 0) {
-      return [];
+
+    var rawForks;
+    while (this.batchSize > 0) {
+      // TODO: max retries
+      try {
+        const start = performance.now();
+        rawForks = await this.#api.graphql(queryForks, {
+          ...this.#query,
+          baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
+          cursor: this.#forksCursor?.endCursor ?? null,
+          branchCount: this.branchCount,
+          count: this.batchSize
+        });
+        const duration = (performance.now() - start) / 1000;
+        this.#optimizeBatchSize(duration);
+        break;
+      } catch (error) {
+        if (error instanceof TimeoutError) {
+          // TODO: try fewer branches
+          this.batchSize = 1;
+          console.debug(`Request timeout. Set batch size to ${this.batchSize}.`);
+          continue;
+        }
+        throw error;
+      }
     }
-    const rawForks: any = await this.#api.graphql(queryForks, {
-      ...this.#query,
-      baseRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`,
-      cursor: this.#forksCursor?.endCursor ?? null,
-      count: 20
-    });
+    if (this.batchSize === 0) {
+      throw new Error("Batch size too small: can not complete request without timeout")
+    }
+
     this.#forksCursor = rawForks.repository.forks.pageInfo;
     var forkRepos: Fork[] = rawForks.repository.forks.nodes.map((fork: any) => {
       return {
@@ -268,22 +313,16 @@ export class ForksAPI {
     return forkRepos;
   }
 
-
-  async getDiffCommits(id?: string) {
-    const repos: Repo[] = [];
-    if (id) {
-      const idRepo = this.#forks.get(id);
-      if (idRepo && idRepo.diff.commits === undefined) {
-        repos.push(idRepo);
-      }
+  async getForkDetails(id: string) {
+    const repo = this.#forks.get(id);
+    if (!repo || repo.diff.commits !== undefined) {
+      return;
     }
-    const additionalRepos = Array.from(this.#forks.values())
-      .filter(f => f.id != id && f.diff.commits === undefined && f.diff.aheadBy > 0);
-    repos.push(...additionalRepos.slice(0, 10));
-    const query = this.#buildDiffCommitsQuery(repos);
+
+    const query = this.#buildDetailsQuery(repo);
 
     const response = await this.#api.graphql(query, { ...this.#query });
-    const commits = flattenCommits(response);
+    const commits = flattenDetails(response);
 
     for (let c of commits) {
       const repo = this.#forks.get(c.repoId);
@@ -293,8 +332,8 @@ export class ForksAPI {
   }
 
   #mergeForks(forks: Fork[]) {
-    if (!this.repo) {
-      console.assert(this.repo);
+    if (!this.#repo) {
+      console.assert(this.#repo);
       return;
     }
     for (const fork of forks) {
@@ -303,13 +342,19 @@ export class ForksAPI {
     }
   }
 
-  #buildDiffCommitsQuery(forks: Repo[]): string {
-    const forkQueries = [];
-    for (let i = 0; i < forks.length; i++) {
-      const fork = forks[i];
-      const headRef = `${fork.owner}:${fork.name}:${fork.defaultBranch}`;
-      forkQueries.push(`fork${i}` + queryCommits.segment1 + headRef + queryCommits.segment2);
+  #buildDetailsQuery(repo: Repo): string {
+    const headRef = `${repo.owner}:${repo.name}:${repo.defaultBranch}`;
+    return queryForkDetails.head + `fork` + queryForkDetails.segment1 + headRef + queryForkDetails.segment2 + queryForkDetails.tail;
+  }
+
+  #optimizeBatchSize(requestDuration: number) {
+    const fractionOfTimeUsed = requestDuration / this.requestDurationTarget;
+    var newBatchSize = this.batchSize / fractionOfTimeUsed;
+    newBatchSize = interpolate(this.batchSize, newBatchSize, this.batchSizeScalingFactor);
+    newBatchSize = Math.min(Math.max(Math.floor(newBatchSize), 1), this.maxBatchSize);
+    if (newBatchSize !== this.batchSize) {
+      console.debug(`Changed batch size to ${this.batchSize}.`);
     }
-    return queryCommits.head + forkQueries.join() + queryCommits.tail;
+    this.batchSize = newBatchSize;
   }
 }
