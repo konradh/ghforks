@@ -101,39 +101,30 @@ query Forks($name: String!, $owner: String!, $count: Int!, $baseRef: String!, $b
     }
   }
 }`;
-const queryForkDetails = {
-  head: `fragment Commits on Comparison {
-  headTarget {
-    repository {
-      id
-      url
-    }
-  }
-  commits(first: 20) {
-    nodes {
-      oid
-      messageHeadline
-      additions
-      deletions
-      committedDate
-    }
-  }
-}
-query ForkDetails($name: String!, $owner: String!) {
+
+const queryForkDetails = `query ForkDetails($name: String!, $owner: String!, $headRef: String!) {
   repository(name: $name, owner: $owner) {
     defaultBranchRef {
-`,
-  segment1: `: compare(headRef: "`,
-  segment2: `") {
-        ...Commits
+      compare(headRef: $headRef) {
+        headTarget {
+          repository {
+            id
+            url
+          }
+        }
+        commits(first: 20) {
+          nodes {
+            oid
+            messageHeadline
+            additions
+            deletions
+            committedDate
+          }
+        }
       }
-      `,
-  tail: `
     }
   }
-}
-`,
-};
+}`;
 
 function flattenRepo(r: any): Repo {
   return {
@@ -186,26 +177,16 @@ function flattenDiffWithoutCommits(fork: any, parent: Repo): Diff {
   }
 }
 
-interface Commits {
-  repoId: string,
-  commits: Commit[],
-}
-
-function flattenDetails(response: any): Commits[] {
-  const repos = Object.values(response.repository.defaultBranchRef);
-  return repos.map((commits: any) => {
-    return {
-      repoId: commits.headTarget.repository.id,
-      commits: commits.commits.nodes.map((commit: any) => ({
-        url: `${commits.headTarget.repository.url}/commit/${commit.oid}`,
-        commitId: commit.oid,
-        message: commit.messageHeadline,
-        additions: commit.additions,
-        deletions: commit.deletions,
-        committedDate: commit.committedDate,
-      }))
-    }
-  })
+function flattenDetails(response: any): Commit[] {
+  const compare = response.repository.defaultBranchRef.compare;
+  return compare.commits.nodes.map((commit: any) => ({
+    url: `${compare.headTarget.repository.url}/commit/${commit.oid}`,
+    commitId: commit.oid,
+    message: commit.messageHeadline,
+    additions: commit.additions,
+    deletions: commit.deletions,
+    committedDate: commit.committedDate,
+  }))
 }
 
 export class ForksAPI {
@@ -319,16 +300,13 @@ export class ForksAPI {
       return;
     }
 
-    const query = this.#buildDetailsQuery(repo);
+    const response = await this.#api.graphql(queryForkDetails, {
+      ...this.#query,
+      headRef: `${repo.owner}:${repo.name}:${repo.defaultBranch}`
+    });
 
-    const response = await this.#api.graphql(query, { ...this.#query });
     const commits = flattenDetails(response);
-
-    for (let c of commits) {
-      const repo = this.#forks.get(c.repoId);
-      if (!repo) { continue };
-      repo.diff.commits = c.commits;
-    }
+    repo.diff.commits = commits;
   }
 
   #mergeForks(forks: Fork[]) {
@@ -340,11 +318,6 @@ export class ForksAPI {
       fork.score = score(fork);
       this.#forks.set(fork.id, fork);
     }
-  }
-
-  #buildDetailsQuery(repo: Repo): string {
-    const headRef = `${repo.owner}:${repo.name}:${repo.defaultBranch}`;
-    return queryForkDetails.head + `fork` + queryForkDetails.segment1 + headRef + queryForkDetails.segment2 + queryForkDetails.tail;
   }
 
   #optimizeBatchSize(requestDuration: number) {
