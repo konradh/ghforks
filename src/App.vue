@@ -78,7 +78,6 @@ onMounted(async () => {
   const token = await auth.getToken();
   if (token) {
     githubAPI.value = new GithubAPI(token);
-    console.log(typeof (githubAPI))
   }
 });
 </script>

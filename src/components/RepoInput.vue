@@ -33,24 +33,12 @@ input {
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { RepoQuery } from "../types";
+import { parseRepo } from "../utils";
 
 const emit = defineEmits<{ (e: "change", value: RepoQuery): void }>();
 
-const repoRegex = new RegExp(
-    "/?(?<owner>[A-Za-z0-9_.-]+)/(?<name>[A-Za-z0-9_.-]+)$"
-);
 const input = ref("");
 const isValid = ref(false);
-
-function parseRepo(input: string): RepoQuery | null {
-    const match = repoRegex.exec(input);
-    const owner = match?.groups?.owner;
-    const name = match?.groups?.name;
-    if (!owner || !name) {
-        return null;
-    }
-    return { owner, name };
-}
 
 function validate() {
     if (input.value === "") {

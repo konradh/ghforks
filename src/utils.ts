@@ -1,3 +1,5 @@
+import { RepoQuery } from "./types";
+
 export function timeDiffApprox(date: Date): string {
     var diff = (new Date()).valueOf() - date.valueOf();
     const seconds = diff / 1000;
@@ -18,4 +20,18 @@ export function timeDiffApprox(date: Date): string {
 
 export function interpolate(a: number, b: number, f: number): number {
     return a + ((b - a) * f);
+}
+
+const repoRegex = new RegExp(
+    "/?(?<owner>[A-Za-z0-9_.-]+)/(?<name>[A-Za-z0-9_.-]+)$"
+);
+
+export function parseRepo(input: string): RepoQuery | null {
+    const match = repoRegex.exec(input);
+    const owner = match?.groups?.owner;
+    const name = match?.groups?.name;
+    if (!owner || !name) {
+        return null;
+    }
+    return { owner, name };
 }
