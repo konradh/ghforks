@@ -11,6 +11,10 @@ export function score(fork: Fork): number {
         return -Infinity;
     }
 
+    if (fork.updatedAt <= fork.createdAt) {
+        return -Infinity;
+    }
+
     var branchesScore = fork.diff.newBranches.map((b: Branch) => f(b.aheadBy)).reduce((a, b) => a + b, 0);
     if (fork.diff.newBranches.length > 1) {
         branchesScore /= fork.diff.newBranches.length;

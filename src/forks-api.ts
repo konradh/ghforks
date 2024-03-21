@@ -18,8 +18,10 @@ const fragmentRepoInfo = `fragment RepoInfo on Repository {
     totalCount
   }
   pushedAt
+  createdAt
+  updatedAt
   forkCount
-  publicForks: forks(privacy: PUBLIC) {
+  directForks: forks(privacy: PUBLIC) {
     totalCount
   }
   defaultBranchRef {
@@ -134,12 +136,10 @@ function flattenRepo(r: any): Repo {
     description: r.description,
     url: r.url,
     pushedAt: new Date(r.pushedAt),
+    createdAt: new Date(r.createdAt),
+    updatedAt: new Date(r.updatedAt),
 
-    forkCount: r.forkCount,
-    forks: {
-      public: r.publicForks.totalCount,
-      private: r.forkCount - r.publicForks.totalCount,
-    },
+    forks: { total: r.forkCount, direct: r.directForks.totalCount },
     stars: r.stargazers.totalCount,
     watchers: r.watchers.totalCount,
     issues: {
@@ -218,7 +218,7 @@ export class ForksAPI {
   }
 
   canLoadMore(): boolean {
-    if (this.#repo?.forks.public === 0) {
+    if (this.#repo?.forks.direct === 0) {
       return false;
     }
     return !this.#forksCursor || this.#forksCursor.hasNextPage;
@@ -248,7 +248,7 @@ export class ForksAPI {
       throw new Error("You must await the result of getRepo once before calling other methods.");
     }
 
-    if (!this.canLoadMore() || repo.forks.public === 0) {
+    if (!this.canLoadMore()) {
       return [];
     }
 

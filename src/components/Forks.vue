@@ -9,15 +9,15 @@
     <div v-if="repo">
         <h2>
             Forks<template v-if="repo">
-                ({{ forks.length }} of {{ repo.forks.public }})</template>
+                ({{ forks.length }} of {{ repo.forks.direct }})</template>
         </h2>
         <div class="align-center">
             <LoadMoreButton v-if="canLoadMore" @click="loadMore" v-model="keepLoading" :loading="loading"
                 :loadingText="loadingText">
             </LoadMoreButton>
         </div>
-        <div v-if="!loading && repo && repo.forks.public === 0">
-            This repository has no public forks.
+        <div v-if="!loading && repo && repo.forks.direct === 0">
+            This repository has no forks.
         </div>
         <div v-else>
             <TransitionGroup name="list">

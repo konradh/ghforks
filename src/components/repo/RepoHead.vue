@@ -13,15 +13,18 @@
                 <span title="open issues"><i class="fa-regular fa-circle-dot"></i> {{ repo.issues.open }}</span>
             </a>
             <a :href="repo.url + '/pulls'" target="_blank" class="no-highlight">
-                <span title="open pull requests"><i class="fa-solid fa-code-pull-request"></i> {{ repo.pullRequests.open }}</span>
+                <span title="open pull requests"><i class="fa-solid fa-code-pull-request"></i> {{ repo.pullRequests.open
+                    }}</span>
             </a>
             <a :href="repo.url + '/forks'" target="_blank" class="no-highlight">
-                <span title="public forks (private forks)"><i class="fa-solid fa-code-fork"></i> {{ repo.forks.public }} <template v-if="repo.forks.private > 0">({{ repo.forks.private }})</template></span>
+                <span title="direct forks"><i class="fa-solid fa-code-fork"></i> {{ repo.forks.direct }}</span>
             </a>
         </div>
     </div>
     <div>
-        <span><i class="fa-solid fa-heart-pulse"></i> pushed to {{ timeDiffApprox(repo.pushedAt) }}</span>
+        <span><i class="fa-solid fa-heart-pulse"></i> <template v-if="repo.updatedAt > repo.createdAt">updated
+                {{ timeDiffApprox(repo.updatedAt) }}</template>
+            <template v-else>never updated</template></span>
     </div>
 </template>
 

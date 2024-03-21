@@ -11,7 +11,7 @@ export function timeDiffApprox(date: Date): string {
     const weeks = days / 7;
     const months = days / 30;
     if (months < 1) { return `${Math.floor(weeks)} weeks ago`; }
-    if (months < 12) { return `${Math.floor(months)} months ago`; }
+    if (months <= 12) { return `${Math.floor(months)} months ago`; }
     const years = days / 365;
     return `${Math.floor(years)} years ago`;
 }
